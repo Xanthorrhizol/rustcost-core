@@ -77,7 +77,7 @@ async fn build_container_raw_data(
     let window = resolve_time_window(&q);
     let repo = resolve_k8s_metric_repository(&MetricScope::Container, &window.granularity);
 
-    let container_infos = if let Some(container_id) = target_container_id.clone() {
+    let mut container_infos = if let Some(container_id) = target_container_id.clone() {
         vec![info_k8s_container_service::get_info_k8s_container(container_id).await?]
     } else {
         info_k8s_container_service::list_k8s_containers(K8sListQuery {
@@ -88,6 +88,32 @@ async fn build_container_raw_data(
         .await?
     };
 
+    // 2. Apply filtering: team, service, env
+    // Helper closure for matching a field
+    let matches = |value: &Option<String>, filter: &str| {
+        value
+            .as_deref()
+            .map(|v| {
+                v.split(',') // allow multiple values like "prod,core"
+                    .any(|x| x.trim().eq_ignore_ascii_case(filter.trim()))
+            })
+            .unwrap_or(false)
+    };
+
+    // Apply filtering
+    if let Some(ref team) = q.team {
+        container_infos.retain(|c| matches(&c.team, team));
+    }
+
+    if let Some(ref service) = q.service {
+        container_infos.retain(|c| matches(&c.service, service));
+    }
+
+    if let Some(ref env) = q.env {
+        container_infos.retain(|c| matches(&c.env, env));
+    }
+
+    // 3. Build metric series
     let mut series = Vec::new();
     for container in container_infos.iter() {
         if let Some(key) = container_metric_key(container) {

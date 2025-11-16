@@ -128,12 +128,19 @@ pub async fn list_k8s_pods(filter: K8sListQuery) -> Result<Vec<InfoPodEntity>> {
     for pod in pod_list.items {
         let pod_uid = pod.metadata.uid.clone();
         let mapped = map_pod_to_info_pod_entity(&pod)?;
+        // If we have cached data, merge fields instead of overwriting
+        let merged = if let Ok(mut existing) = repo.read(&pod_uid) {
+            existing.merge_from(mapped);
+            existing
+        } else {
+            mapped
+        };
 
-        if let Err(e) = repo.update(&mapped) {
+        if let Err(e) = repo.update(&merged) {
             debug!("⚠️ Failed to update pod '{}': {:?}", pod_uid, e);
         }
 
-        result_entities.push(mapped);
+        result_entities.push(merged);
     }
 
     Ok(result_entities)

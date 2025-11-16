@@ -86,7 +86,7 @@ async fn build_pod_raw_data(
     q: RangeQuery,
     target_pod_uid: Option<String>,
 ) -> Result<(MetricGetResponseDto, Vec<InfoPodEntity>)> {
-    let pod_infos = if let Some(pod_uid) = target_pod_uid.clone() {
+    let mut pod_infos = if let Some(pod_uid) = target_pod_uid.clone() {
         vec![info_k8s_pod_service::get_info_k8s_pod(pod_uid).await?]
     } else {
         info_k8s_pod_service::list_k8s_pods(K8sListQuery {
@@ -96,7 +96,32 @@ async fn build_pod_raw_data(
         })
         .await?
     };
+    // 2. Apply team/service/env filtering
+    // Helper closure for matching a field
+    let matches = |value: &Option<String>, filter: &str| {
+        value
+            .as_deref()
+            .map(|v| {
+                v.split(',')
+                    .any(|x| x.trim().eq_ignore_ascii_case(filter.trim()))
+            })
+            .unwrap_or(false)
+    };
 
+    if let Some(ref team) = q.team {
+        pod_infos.retain(|p| matches(&p.team, team));
+    }
+
+    if let Some(ref service) = q.service {
+        pod_infos.retain(|p| matches(&p.service, service));
+    }
+
+    if let Some(ref env) = q.env {
+        pod_infos.retain(|p| matches(&p.env, env));
+    }
+
+
+    // 3. Build metric series based on the filtered pods
     let response = build_pod_series_for_infos(&q, &pod_infos, target_pod_uid.clone())?;
     Ok((response, pod_infos))
 }

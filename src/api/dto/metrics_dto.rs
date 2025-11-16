@@ -17,7 +17,9 @@ pub struct RangeQuery {
 
     /// Optional override: "minute", "hour", "day"
     pub granularity: Option<MetricGranularity>,
-    
 
+    pub team: Option<String>,
+    pub service: Option<String>,
+    pub env: Option<String>, // "dev", "stage", "prod"
 }
 

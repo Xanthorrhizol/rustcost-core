@@ -80,18 +80,19 @@ pub async fn get_info_k8s_container(container_id: String) -> Result<InfoContaine
     ))
 }
 
-
 /// List containers — supports optional filters: namespace, pod_name, node_name.
-/// List containers — supports optional filters: namespace, pod_name, node_name.
+/// Uses local FS cache when fresh, refreshes stale entries.
 pub async fn list_k8s_containers(filter: K8sListQuery) -> Result<Vec<InfoContainerEntity>> {
     let token = read_token()?;
     let client = build_client()?;
     let repo = InfoK8sContainerApiRepositoryImpl::default();
 
-    let mut fresh_entities = Vec::new();
-    let mut expired_entities = Vec::new();
+    let mut cached_entities = Vec::new();
+    let mut expired_or_missing = false;
 
-    // 1️⃣ Load cache
+    // -------------------------------------------------------------
+    // 1️⃣ Load cache entries from filesystem
+    // -------------------------------------------------------------
     let container_dir = info_k8s_container_dir_path();
     if container_dir.exists() {
         if let Ok(entries) = fs::read_dir(&container_dir) {
@@ -100,31 +101,35 @@ pub async fn list_k8s_containers(filter: K8sListQuery) -> Result<Vec<InfoContain
                 if let Ok(existing) = repo.read(&id) {
                     if let Some(ts) = existing.last_updated_info_at {
                         if Utc::now().signed_duration_since(ts) <= Duration::hours(1) {
-                            debug!("✅ Using cached container info for '{}'", id);
-                            fresh_entities.push(existing);
+                            debug!("✅ Using cached container info: {}", id);
+                            cached_entities.push(existing);
                             continue;
                         }
                     }
-                    debug!("⚠️ Cache expired for '{}'", id);
-                    expired_entities.push(existing);
+
+                    debug!("⚠️ Cache expired for container '{}'", id);
+                    expired_or_missing = true;
+                } else {
+                    expired_or_missing = true;
                 }
             }
         }
     }
 
-    // 2️⃣ If all cache entries are still valid
-    if expired_entities.is_empty() {
-        debug!("📦 All cached container info fresh, skipping API fetch.");
-        return Ok(fresh_entities);
+    // -------------------------------------------------------------
+    // 2️⃣ If everything is fresh, return cached only
+    // -------------------------------------------------------------
+    if !expired_or_missing && !cached_entities.is_empty() {
+        debug!("📦 All cached containers fresh — no API call needed.");
+        return Ok(cached_entities);
     }
 
-    debug!(
-        "🌐 Fetching {} expired/missing container(s) from K8s API",
-        expired_entities.len()
-    );
+    // -------------------------------------------------------------
+    // 3️⃣ Fetch pods from API (containers come from Pods)
+    // -------------------------------------------------------------
+    debug!("🌐 Fetching pods for container refresh");
 
-    // 3️⃣ Select appropriate fetcher
-    let pods = if let Some(ns) = &filter.namespace {
+    let pod_list = if let Some(ns) = &filter.namespace {
         fetch_pods_by_namespace(&token, &client, ns).await?
     } else if let Some(node) = &filter.node_name {
         fetch_pods_by_node(&token, &client, node).await?
@@ -132,48 +137,58 @@ pub async fn list_k8s_containers(filter: K8sListQuery) -> Result<Vec<InfoContain
         fetch_pods(&token, &client).await?
     };
 
-    debug!("Fetched {} pod(s) from API", pods.items.len());
+    debug!("Fetched {} pod(s) from API", pod_list.items.len());
 
-    // 4️⃣ Map pod containers → InfoContainerEntity
-    for pod in pods.items {
+    let mut results = cached_entities;
+
+    // -------------------------------------------------------------
+    // 4️⃣ Convert pod container statuses into InfoContainerEntity
+    // -------------------------------------------------------------
+    for pod in pod_list.items {
         let ns = pod.metadata.namespace.clone();
         let pod_uid = pod.metadata.uid.clone();
 
-        // `spec` is not Option, `status` is Option
-        if let Some(status) = pod.status.as_ref() {
-            for container in &pod.spec.containers {
-                let container_name = &container.name;
+        if let Some(ref status) = pod.status {
+            for container in pod.spec.containers.iter() {
+                let cname = &container.name;
 
-                let cs = status
-                    .container_statuses
+                let cs = status.container_statuses
                     .iter()
-                    .find(|s| s.name == *container_name);
+                    .find(|s| s.name == *cname);
 
-                let mut entity =
-                    map_container_status_to_info_container_entity(&pod, container, cs).unwrap_or_else(|e| {
-                        panic!("Failed to map container '{}': {:?}", container_name, e)
-                    });
+                let mut mapped =
+                    map_container_status_to_info_container_entity(&pod, container, cs)
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to map container '{}': {:?}", cname, e)
+                        });
 
+                mapped.namespace = Some(ns.clone());
+                mapped.pod_uid = Some(pod_uid.clone());
+                mapped.container_name = Some(cname.clone());
+                mapped.container_id = Some(format!("{}-{}", pod_uid, cname));
+                mapped.last_updated_info_at = Some(Utc::now());
 
-                entity.namespace = Some(ns.clone());
-                entity.pod_uid = Some(pod_uid.clone());
-                entity.container_name = Some(container_name.clone());
-                entity.container_id = Some(format!("{}-{}", pod_uid, container_name));
-                entity.last_updated_info_at = Some(Utc::now());
+                let id = mapped.container_id.clone().unwrap();
 
-                if let Err(e) = repo.update(&entity) {
-                    debug!(
-                        "⚠️ Failed to update container '{:?}': {:?}",
-                        entity.container_id, e
-                    );
+                // If cached exists → merge metadata
+                let merged = if let Ok(mut existing) = repo.read(&id) {
+                    existing.merge_from(mapped);
+                    existing
+                } else {
+                    mapped
+                };
+
+                // Write back to FS
+                if let Err(e) = repo.update(&merged) {
+                    debug!("⚠️ Failed to update container '{}': {:?}", id, e);
                 }
 
-                fresh_entities.push(entity);
+                results.push(merged);
             }
         }
     }
 
-    Ok(fresh_entities)
+    Ok(results)
 }
 
 pub async fn patch_info_k8s_container(

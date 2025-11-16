@@ -63,6 +63,29 @@ fn metric_node_entity_to_point(entity: MetricNodeEntity) -> UniversalMetricPoint
     }
 }
 
+/// Builds a raw metrics response for Kubernetes nodes.
+///
+/// This function prepares the full metrics output for one or more nodes by
+/// resolving the query window, selecting which nodes to process, fetching
+/// metric points, and assembling a `MetricGetResponseDto`.
+///
+/// Node selection behavior:
+/// - If `target` is `Some(node_name)`, only that specific node is loaded.
+/// - If `target` is `None`, all nodes are loaded.
+/// - After loading nodes, optional filters in `RangeQuery` (`team`, `service`, `env`)
+///   are applied to narrow down the node list.
+///
+/// Processing steps:
+/// 1. Resolve the time window and choose a metric repository based on `RangeQuery`.
+/// 2. Load either a single node or the full list of nodes.
+/// 3. Apply optional filters (`team`, `service`, `env`) to the node list.
+/// 4. For each remaining node, fetch its metric data points.
+/// 5. Construct the `MetricGetResponseDto` containing the final metric series.
+///
+/// Returns:
+/// A tuple containing:
+/// - `MetricGetResponseDto`: the complete metrics response for the selected nodes.
+/// - `Vec<InfoNodeEntity>`: metadata for all nodes included in the response.
 async fn build_node_raw_data(
     q: RangeQuery,
     target: Option<String>,
@@ -70,11 +93,38 @@ async fn build_node_raw_data(
     let window = resolve_time_window(&q);
     let repo = resolve_k8s_metric_repository(&MetricScope::Node, &window.granularity);
 
-    let node_infos = if let Some(node_name) = target.clone() {
+    // 1. Load node list (single or all)
+    let mut node_infos = if let Some(node_name) = target.clone() {
         vec![info_k8s_node_service::get_info_k8s_node(node_name).await?]
     } else {
         info_k8s_node_service::list_k8s_nodes().await?
     };
+
+    // 2. Apply team/service/env filtering
+    // Helper closure for matching a field
+    let matches = |value: &Option<String>, filter: &str| {
+        value
+            .as_deref()
+            .map(|v| {
+                v.split(',') // allow multiple values like "prod,core"
+                    .any(|x| x.trim().eq_ignore_ascii_case(filter.trim()))
+            })
+            .unwrap_or(false)
+    };
+
+    // Apply filtering
+    if let Some(ref team) = q.team {
+        node_infos.retain(|c| matches(&c.team, team));
+    }
+
+    if let Some(ref service) = q.service {
+        node_infos.retain(|c| matches(&c.service, service));
+    }
+
+    if let Some(ref env) = q.env {
+        node_infos.retain(|c| matches(&c.env, env));
+    }
+
 
     let mut series = Vec::new();
     for node in node_infos.iter() {
