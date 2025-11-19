@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use reqwest::Client;
 use serde_json::{Map, Value};
 use tracing::debug;
-use tracing::log::info;
 use crate::core::client::k8s::client_k8s_pod_dto::{PodList, Pod};
 use crate::core::client::k8s::util::k8s_api_server;
 use urlencoding::encode;
@@ -180,7 +179,7 @@ pub async fn fetch_pod_by_name_and_namespace(
         pod_name
     );
 
-    info!("📡 Fetching Pod '{}/{}' from '{}'", namespace, pod_name, url);
+    debug!("📡 Fetching Pod '{}/{}' from '{}'", namespace, pod_name, url);
 
     // 1️⃣ Fetch raw JSON into a generic serde_json::Map
     let raw_json: Map<String, Value> = client
@@ -194,7 +193,7 @@ pub async fn fetch_pod_by_name_and_namespace(
 
     // 2️⃣ Debug print structure (pretty JSON)
     let pretty = serde_json::to_string_pretty(&raw_json)?;
-    info!("🧩 Raw Pod structure:\n{}", pretty);
+    debug!("🧩 Raw Pod structure:\n{}", pretty);
 
     // 3️⃣ Convert back into strongly typed Pod
     let pod: Pod = serde_json::from_value(Value::Object(raw_json))?;

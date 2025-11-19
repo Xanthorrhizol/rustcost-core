@@ -80,7 +80,8 @@ fn process_all_containers<R: MetricContainerHourProcessorRepository>(
                 "✅ Aggregated container '{}' minute metrics from {} → {}",
                 container_key, start, end
             ),
-            Err(err) => error!(
+            Err(err) => debug!(
+                // TODO deleted container handling
                 "⚠️ Failed to aggregate container '{}' metrics: {}",
                 container_key, err
             ),
