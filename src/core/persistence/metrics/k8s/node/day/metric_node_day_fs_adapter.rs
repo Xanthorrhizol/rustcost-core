@@ -195,7 +195,6 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
     }
 
 
-
     fn cleanup_old(&self, node_uid: &str, before: DateTime<Utc>) -> Result<()> {
         let dir = metric_k8s_node_key_day_dir_path(node_uid);
         if !dir.exists() { return Ok(()); }
@@ -478,7 +477,6 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
 
         Ok(filtered)
     }
-
     fn get_row_between(
         &self,
         start: DateTime<Utc>,
@@ -488,8 +486,6 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
         offset: Option<usize>,
     ) -> Result<Vec<MetricNodeEntity>> {
         let mut data: Vec<MetricNodeEntity> = vec![];
-
-        // 1️⃣ Loop over each date in the range
         let mut current_date = start.date_naive();
         let end_date = end.date_naive();
 
@@ -498,11 +494,7 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
             let path_obj = Path::new(&path);
 
             if !path_obj.exists() {
-                tracing::debug!(
-                "Metric file not found for {} on {}",
-                object_name,
-                current_date
-            );
+                tracing::debug!("Metric file not found for {} on {}", object_name, current_date);
                 current_date = current_date.succ_opt().unwrap_or(current_date);
                 continue;
             }
@@ -519,19 +511,29 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
             let reader = BufReader::new(file);
             let mut lines = reader.lines();
 
-            // 2️⃣ Try to read the first line (header or data)
             let first_line_opt = lines.next();
             if first_line_opt.is_none() {
                 current_date = current_date.succ_opt().unwrap_or(current_date);
                 continue;
             }
 
-            let first_line = first_line_opt.unwrap_or_else(|| Ok(String::new()))?;
-            let mut rows: Vec<MetricNodeEntity> = vec![];
-            let header: Vec<&str>;
+            let first_line = match first_line_opt {
+                Some(Ok(line)) => line,
+                Some(Err(e)) => {
+                    tracing::warn!("Error reading line from {:?}: {}", path_obj, e);
+                    current_date = current_date.succ_opt().unwrap_or(current_date);
+                    continue;
+                }
+                None => continue,
+            };
 
-            // Detect header vs direct data
-            if first_line.starts_with("20") {
+            // Detect header or data
+            let header: Vec<&str>;
+            let mut data_lines: Vec<String> = vec![];
+
+            if first_line.starts_with("TIME") || first_line.contains("CPU_USAGE") {
+                header = first_line.split('|').collect();
+            } else {
                 header = vec![
                     "TIME", "CPU_USAGE_NANO_CORES", "CPU_USAGE_CORE_NANO_SECONDS",
                     "MEMORY_USAGE_BYTES", "MEMORY_WORKING_SET_BYTES", "MEMORY_RSS_BYTES",
@@ -539,56 +541,33 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
                     "NETWORK_PHYSICAL_RX_ERRORS", "NETWORK_PHYSICAL_TX_ERRORS",
                     "FS_USED_BYTES", "FS_CAPACITY_BYTES", "FS_INODES_USED", "FS_INODES",
                 ];
-
-                if let Some(row) = Self::parse_line(&header, &first_line) {
-                    if row.time >= start && row.time <= end {
-                        rows.push(row);
-                    }
-                }
-            } else {
-                header = first_line.split('|').collect();
+                data_lines.push(first_line);
             }
 
-            // 3️⃣ Process the rest of the file
-            for line in lines.flatten() {
+            data_lines.extend(lines.flatten());
+
+            for line in data_lines {
                 if let Some(row) = Self::parse_line(&header, &line) {
-                    if row.time < start {
+                    // Full time filtering (fixes duplication)
+                    if row.time < start || row.time > end {
                         continue;
                     }
-                    if row.time > end {
-                        break;
-                    }
-                    rows.push(row);
+                    data.push(row);
                 }
             }
 
-            // Merge into main data list
-            data.append(&mut rows);
-
-            // Move to next date
-            current_date = match current_date.succ_opt() {
-                Some(next) => next,
-                None => break,
-            };
+            current_date = current_date.succ_opt().unwrap_or(current_date);
         }
 
-        // 4️⃣ Sort and paginate
+        // Remove duplicates by timestamp (just in case)
         data.sort_by_key(|r| r.time);
+        data.dedup_by_key(|r| r.time);
 
+        // Pagination
         let start_idx = offset.unwrap_or(0);
         let limit = limit.unwrap_or(data.len());
         let slice: Vec<_> = data.into_iter().skip(start_idx).take(limit).collect();
 
-        tracing::debug!(
-        "Returning {} metric rows for {} between {} and {}",
-        slice.len(),
-        object_name,
-        start,
-        end
-    );
-
         Ok(slice)
     }
-
-
 }
