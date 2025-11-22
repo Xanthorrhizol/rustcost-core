@@ -1,4 +1,4 @@
-use super::info_unit_price_entity::InfoUnitPriceEntity;
+use super::info_unit_price_entity::{Currency, InfoUnitPriceEntity};
 use crate::core::persistence::info::fixed::info_fixed_fs_adapter_trait::InfoFixedFsAdapterTrait;
 use crate::core::persistence::storage_path::info_unit_price_path;
 use anyhow::{Context, Result};
@@ -53,6 +53,13 @@ impl InfoFixedFsAdapterTrait<InfoUnitPriceEntity> for InfoUnitPriceFsAdapter {
                     "network_local_gb" => entity.network_local_gb = val.parse().unwrap_or_default(),
                     "network_regional_gb" => entity.network_regional_gb = val.parse().unwrap_or_default(),
                     "network_external_gb" => entity.network_external_gb = val.parse().unwrap_or_default(),
+
+                    "currency" => {
+                        match val.to_uppercase().as_str() {
+                            "USD" => entity.currency = Currency::USD,
+                            _ => {} // ignore or fallback
+                        }
+                    }
 
                     // Updated timestamp
                     "updated_at" => {
@@ -123,7 +130,7 @@ impl InfoUnitPriceFsAdapter {
         writeln!(f, "network_local_gb:{}", data.network_local_gb)?;
         writeln!(f, "network_regional_gb:{}", data.network_regional_gb)?;
         writeln!(f, "network_external_gb:{}", data.network_external_gb)?;
-
+        writeln!(f, "currency:{:?}", data.currency)?;
         writeln!(f, "updated_at:{}", data.updated_at.to_rfc3339())?;
 
         // --- Flush + sync to ensure data is fully written to disk ---

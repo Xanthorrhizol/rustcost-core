@@ -11,6 +11,12 @@ use crate::domain::info::dto::info_unit_price_upsert_request::InfoUnitPriceUpser
 /// Example use:
 /// Combine this configuration with resource metrics (e.g., [`MetricNodeEntity`])
 /// to estimate the operational cost of a node, pod, or container.
+///
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Currency {
+    USD,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfoUnitPriceEntity {
     // --- CPU ---
@@ -43,6 +49,9 @@ pub struct InfoUnitPriceEntity {
     /// Price per GB transferred to external networks (internet egress)
     pub network_external_gb: f64,
 
+    // = always USD
+    pub currency: Currency,
+
     /// Last update timestamp (UTC).
     pub updated_at: DateTime<Utc>,
 }
@@ -59,6 +68,7 @@ impl InfoUnitPriceEntity {
         if let Some(v) = req.network_local_gb { self.network_local_gb = v; }
         if let Some(v) = req.network_regional_gb { self.network_regional_gb = v; }
         if let Some(v) = req.network_external_gb { self.network_external_gb = v; }
+        self.updated_at = Utc::now();
     }
 }
 
@@ -76,6 +86,7 @@ impl Default for InfoUnitPriceEntity {
             network_local_gb: 0.01,
             network_regional_gb: 0.01,
             network_external_gb: 0.12,
+            currency: Currency::USD,
             updated_at: now,
         }
     }
