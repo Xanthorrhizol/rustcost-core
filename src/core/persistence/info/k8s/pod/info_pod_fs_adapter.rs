@@ -3,7 +3,7 @@ use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
 use anyhow::{anyhow, Context, Result};
 use std::{
     fs::{self, File},
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader},
     path::Path,
 };
 use tracing::log::debug;

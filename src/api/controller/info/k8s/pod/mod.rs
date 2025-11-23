@@ -5,9 +5,8 @@ use crate::api::dto::ApiResponse;
 use crate::api::dto::info_dto::K8sListQuery;
 use crate::api::util::validation_ext::ValidateRequestExt;
 use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
-use crate::domain::info::dto::info_k8s_container_patch_request::InfoK8sContainerPatchRequest;
 use crate::domain::info::dto::info_k8s_pod_patch_request::InfoK8sPodPatchRequest;
-use crate::domain::info::service::{info_k8s_container_service, info_k8s_pod_service};
+use crate::domain::info::service::{info_k8s_pod_service};
 
 pub async fn get_info_k8s_pod(
     Path(pod_uid): Path<String>,

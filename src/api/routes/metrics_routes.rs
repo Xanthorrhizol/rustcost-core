@@ -8,9 +8,10 @@ use crate::api::controller::metric::k8s::container as con_ctr;
 use crate::api::controller::metric::k8s::deployment as deploy_ctr;
 use crate::api::controller::metric::k8s::pod as pod_ctr;
 use crate::api::controller::metric::k8s::cluster as cluster_ctr;
+use crate::app_state::AppState;
 
 /// Build the router for metrics endpoints under /api/v1/metrics
-pub fn metrics_routes() -> Router {
+pub fn metrics_routes() -> Router<AppState> {
     Router::new()
         // Nodes
         .route("/nodes/raw", get(node_ctr::nodes_raw))

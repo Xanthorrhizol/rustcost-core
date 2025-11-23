@@ -4,7 +4,6 @@ use serde_json::Value;
 use crate::api::dto::ApiResponse;
 use crate::api::util::validation_ext::ValidateRequestExt;
 use crate::core::persistence::info::k8s::node::info_node_entity::InfoNodeEntity;
-use crate::domain::info::dto::info_k8s_container_patch_request::InfoK8sContainerPatchRequest;
 use crate::domain::info::dto::info_k8s_node_patch_request::InfoK8sNodePatchRequest;
 use crate::domain::info::service::info_k8s_node_service;
 

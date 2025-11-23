@@ -2,7 +2,6 @@ use crate::core::persistence::info::fixed::version::info_version_entity::InfoVer
 use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::Client;
-use std::env;
 use crate::core::client::k8s::util::k8s_api_server;
 
 /// Fetches Kubernetes version info from RUSTCOST_K8S_API_URL in .env

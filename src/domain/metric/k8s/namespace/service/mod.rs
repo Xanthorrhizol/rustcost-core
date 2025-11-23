@@ -6,7 +6,7 @@ use crate::api::dto::{info_dto::K8sListQuery, metrics_dto::RangeQuery};
 use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
 use crate::domain::info::service::{info_k8s_pod_service, info_unit_price_service};
 use crate::domain::metric::k8s::common::dto::{CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricScope, MetricSeriesDto, NetworkMetricDto, UniversalMetricPointDto};
-use crate::domain::metric::k8s::common::service_helpers::{aggregate_cost_points, aggregate_points, apply_costs, build_cost_summary_dto, build_cost_trend_dto, build_raw_summary_value};
+use crate::domain::metric::k8s::common::service_helpers::{aggregate_cost_points, apply_costs, build_cost_summary_dto, build_cost_trend_dto, build_raw_summary_value};
 use crate::domain::metric::k8s::pod::service::build_pod_response_from_infos;
 
 fn group_pods_by_namespace(pods: Vec<InfoPodEntity>) -> HashMap<String, Vec<InfoPodEntity>> {
@@ -317,7 +317,7 @@ pub async fn get_metric_k8s_namespaces_raw_summary(q: RangeQuery) -> Result<Valu
     build_raw_summary_value(&aggregated, MetricScope::Namespace, all_pods.len())
 }
 
-pub async fn get_metric_k8s_namespace_raw_efficiency(namespace: String, _q: RangeQuery) -> Result<Value> {
+pub async fn get_metric_k8s_namespace_raw_efficiency(_namespace: String, _q: RangeQuery) -> Result<Value> {
     Ok(json!({
         "status": "not_supported",
         "message": "Namespace efficiency not supported yet"

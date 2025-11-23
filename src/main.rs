@@ -11,6 +11,7 @@ mod routes;
 mod scheduler;
 pub mod core;
 mod debug;
+mod app_state;
 
 // --- Imports ---
 use crate::config::config;
@@ -19,6 +20,7 @@ use crate::debug::run_debug;
 use crate::routes::app_router;
 use crate::scheduler::scheduler_start_all_tasks;
 use tracing::{error, info};
+use crate::app_state::{build_app_state};
 
 // --- Entry Point ---
 #[tokio::main]
@@ -35,7 +37,8 @@ async fn main() {
 
 /// ✅ Run the Axum server
 async fn run_server(app_config: &crate::config::Config) {
-    let app = app_router();
+    let app_state = build_app_state();
+    let app = app_router().with_state(app_state);
     let address = format!("{}:{}", app_config.server_host(), app_config.server_port());
     let socket_addr: SocketAddr = address.parse().expect("Invalid socket address");
     let rustcost_debug_mode = std::env::var("RUSTCOST_DEBUG_MODE")

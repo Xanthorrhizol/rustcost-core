@@ -20,7 +20,6 @@ use crate::domain::metric::k8s::common::dto::metric_k8s_raw_summary_dto::{
 };
 use crate::domain::metric::k8s::common::util::k8s_metric_determine_granularity::determine_granularity;
 use std::collections::HashMap;
-use tracing::error;
 use tracing::log::warn;
 
 pub const BYTES_PER_GB: f64 = 1_073_741_824.0;

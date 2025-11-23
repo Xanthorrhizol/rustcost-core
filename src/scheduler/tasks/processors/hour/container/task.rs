@@ -9,7 +9,7 @@ use crate::core::persistence::metrics::k8s::container::hour::{
     metric_container_hour_processor_repository_trait::MetricContainerHourProcessorRepository,
 };
 use crate::scheduler::tasks::processors::hour::container::metric_container_hour_processor_repository::MetricContainerHourProcessorRepositoryImpl;
-use tracing::{debug, error};
+use tracing::{debug};
 use crate::core::persistence::metrics::k8s::path::metric_k8s_container_dir_path;
 
 /// Aggregates all containers’ minute-level metrics into hour metrics.

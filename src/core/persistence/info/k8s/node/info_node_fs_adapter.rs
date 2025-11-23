@@ -1,8 +1,8 @@
 use super::info_node_entity::InfoNodeEntity;
 use crate::core::persistence::info::k8s::info_dynamic_fs_adapter_trait::InfoDynamicFsAdapterTrait;
 use anyhow::{anyhow, Context, Result};
-use std::{fs::{self, File}, io::{BufRead, BufReader, Write}, path::Path};
-use crate::core::persistence::info::path::{info_k8s_node_key_dir_path, info_k8s_node_file_path, info_k8s_container_file_path};
+use std::{fs::{self, File}, io::{BufRead, BufReader}, path::Path};
+use crate::core::persistence::info::path::{info_k8s_node_key_dir_path, info_k8s_node_file_path};
 
 /// File-based FS adapter for the `InfoNodeEntity`.
 ///

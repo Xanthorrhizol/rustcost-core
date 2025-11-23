@@ -1,7 +1,6 @@
 use anyhow::Result;
 use tracing::{debug, error};
 use crate::core::persistence::info::fixed::setting::info_setting_repository::InfoSettingRepository;
-use crate::core::persistence::info::fixed::setting::info_setting_retention_repository_trait::InfoSettingRetentionRepository;
 use crate::scheduler::tasks::processors::retention::task::RetentionTask;
 
 pub async fn run() -> Result<()> {

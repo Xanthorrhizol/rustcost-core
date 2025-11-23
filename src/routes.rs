@@ -5,10 +5,10 @@ use axum::{
     Router,
 };
 use tower_http::cors::CorsLayer;
-
+use crate::app_state::AppState;
 
 /// Build the main application router
-pub fn app_router() -> Router {
+pub fn app_router() -> Router<AppState> {
     // Metrics, Info, System subrouters live under /api/v1
     let api_v1 = Router::new()
         .nest("/metrics", crate::api::routes::metrics_routes::metrics_routes())

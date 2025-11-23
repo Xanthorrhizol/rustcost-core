@@ -13,8 +13,9 @@ use crate::api::controller::info::k8s::resource_quota::get_k8s_resource_quotas;
 use crate::api::controller::info::k8s::limit_range::get_k8s_limit_ranges;
 use crate::api::controller::info::k8s::hpa::get_k8s_hpas;
 use crate::api::controller::info::k8s::{container, node, pod};
+use crate::app_state::AppState;
 
-pub fn info_routes() -> Router {
+pub fn info_routes() -> Router<AppState> {
     Router::new()
         .route("/settings", get(get_info_settings).put(upsert_info_settings))
         .route("/unit-prices", get(ic::get_info_unit_prices).put(ic::upsert_info_unit_prices))
