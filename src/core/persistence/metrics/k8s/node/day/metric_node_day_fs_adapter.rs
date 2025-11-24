@@ -1,6 +1,6 @@
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use std::io::BufWriter;
 use std::{
@@ -23,12 +23,22 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricNodeDayFsAdapter;
 
 impl MetricNodeDayFsAdapter {
+    fn delete_batch(batch: &[PathBuf]) -> Result<()> {
+        for path in batch {
+            match fs::remove_file(path) {
+                Ok(_) => tracing::info!("Deleted old metric file {:?}", path),
+                Err(e) => tracing::error!("Failed to delete {:?}: {}", path, e),
+            }
+        }
+        Ok(())
+    }
+
     fn build_path_for(&self, node_key: &str, date: NaiveDate) -> PathBuf {
         let year_str = date.format("%Y").to_string();
         metric_k8s_node_key_day_file_path(node_key, &year_str)
     }
 
-    fn parse_line(header: &[&str], line: &str) -> Option<MetricNodeEntity> {
+    fn parse_line(_header: &[&str], line: &str) -> Option<MetricNodeEntity> {
         use chrono::{DateTime, Utc};
 
         let parts: Vec<&str> = line.split('|').collect();
@@ -196,26 +206,62 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeDayFsAdapter {
 
 
     fn cleanup_old(&self, node_uid: &str, before: DateTime<Utc>) -> Result<()> {
+        const BATCH_SIZE: usize = 200;
+
         let dir = metric_k8s_node_key_day_dir_path(node_uid);
-        if !dir.exists() { return Ok(()); }
+        if !dir.exists() {
+            return Ok(());
+        }
 
         let cutoff_year = before.year();
+        let mut batch = Vec::with_capacity(BATCH_SIZE);
+
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("rcd") { continue; }
 
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                if let Ok(year) = stem.parse::<i32>() {
-                    if year < cutoff_year {
-                        fs::remove_file(&path)
-                            .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
-                    }
+            // Must be .rcd
+            if path.extension().and_then(|e| e.to_str()) != Some("rcd") {
+                continue;
+            }
+
+            // Extract filename stem as UTF-8
+            let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s.trim(),
+                None => {
+                    tracing::warn!("Skipping file with invalid UTF-8 name: {:?}", path);
+                    continue;
+                }
+            };
+
+            // Parse year (e.g., "2023")
+            let file_year: i32 = match stem.parse() {
+                Ok(y) => y,
+                Err(_) => {
+                    tracing::warn!("Skipping invalid year filename '{}'", stem);
+                    continue;
+                }
+            };
+
+            // Check retention policy
+            if file_year < cutoff_year {
+                batch.push(path);
+
+                if batch.len() >= BATCH_SIZE {
+                    Self::delete_batch(&batch)?;
+                    batch.clear();
                 }
             }
         }
+
+        // Flush remaining batch
+        if !batch.is_empty() {
+            Self::delete_batch(&batch)?;
+        }
+
         Ok(())
     }
+
 
     fn get_column_between(
         &self,

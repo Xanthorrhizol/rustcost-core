@@ -23,6 +23,16 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricPodDayFsAdapter;
 
 impl MetricPodDayFsAdapter {
+    const BATCH_SIZE: usize = 200;
+
+    fn delete_batch(batch: &[PathBuf]) -> Result<()> {
+        for path in batch {
+            fs::remove_file(path)
+                .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
+        }
+        Ok(())
+    }
+
     fn build_path_for(&self, pod_uid: &str, date: chrono::NaiveDate) -> PathBuf {
         let year_str = date.format("%Y").to_string();
         metric_k8s_pod_key_day_file_path(pod_uid, &year_str)
@@ -204,26 +214,43 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodDayFsAdapter {
         Ok(())
     }
 
-
-
     fn cleanup_old(&self, pod_uid: &str, before: DateTime<Utc>) -> Result<()> {
         let dir = metric_k8s_pod_key_day_dir_path(pod_uid);
         if !dir.exists() { return Ok(()); }
 
         let cutoff_year = before.year();
+        let mut batch = Vec::with_capacity(Self::BATCH_SIZE);
+
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("rcd") { continue; }
 
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                if let Ok(year) = stem.parse::<i32>() {
-                    if year < cutoff_year {
-                        fs::remove_file(&path)
-                            .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
-                    }
+            if path.extension().and_then(|e| e.to_str()) != Some("rcd") {
+                continue;
+            }
+
+            let stem = match path.file_stem().and_then(|s| s.to_str()).map(|s| s.trim()) {
+                Some(s) => s,
+                None => continue,
+            };
+
+            let file_year: i32 = match stem.parse() {
+                Ok(y) => y,
+                Err(_) => continue,
+            };
+
+            if file_year < cutoff_year {
+                batch.push(path);
+
+                if batch.len() >= Self::BATCH_SIZE {
+                    Self::delete_batch(&batch)?;
+                    batch.clear();
                 }
             }
+        }
+
+        if !batch.is_empty() {
+            Self::delete_batch(&batch)?;
         }
 
         Ok(())

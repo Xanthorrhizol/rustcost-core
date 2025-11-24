@@ -1,6 +1,6 @@
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use std::io::BufWriter;
 use std::{
@@ -22,6 +22,15 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricPodMinuteFsAdapter;
 
 impl MetricPodMinuteFsAdapter {
+    fn delete_batch(batch: &[PathBuf]) -> Result<()> {
+        for path in batch {
+            match fs::remove_file(path) {
+                Ok(_) => tracing::debug!("Deleted old metric file {:?}", path),
+                Err(e) => tracing::error!("Failed to delete {:?}: {}", path, e),
+            }
+        }
+        Ok(())
+    }
     fn build_path_for(&self, pod_uid: &str, date: NaiveDate) -> PathBuf {
         let date_str = date.format("%Y-%m-%d").to_string();
         metric_k8s_pod_key_minute_file_path(pod_uid, &date_str)
@@ -130,25 +139,66 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodMinuteFsAdapter {
     }
 
     fn cleanup_old(&self, pod_uid: &str, before: DateTime<Utc>) -> Result<()> {
+        const BATCH_SIZE: usize = 200;
+
         let dir = metric_k8s_pod_key_minute_dir_path(pod_uid);
-        if !dir.exists() { return Ok(()); }
+        if !dir.exists() {
+            return Ok(());
+        }
+
+        let cutoff = before.date_naive();
+        let mut batch: Vec<PathBuf> = Vec::with_capacity(BATCH_SIZE);
 
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("rcd") { continue; }
 
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                if let Ok(file_date) = NaiveDate::parse_from_str(stem, "%Y-%m-%d") {
-                    if file_date < before.date_naive() {
-                        fs::remove_file(&path)
-                            .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
-                    }
+            // Only process *.rcd
+            if path.extension().and_then(|e| e.to_str()) != Some("rcd") {
+                continue;
+            }
+
+            // Extract filename stem
+            let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s.trim(),
+                None => {
+                    tracing::warn!("Skipping file with invalid UTF-8 filename: {:?}", path);
+                    continue;
+                }
+            };
+
+            // Extract YYYY-MM-DD prefix (minute files are named like 2025-02-14.rcd or 2025-02-14T10:05)
+            let date_str = &stem[..stem.len().min(10)];
+
+            // Parse date
+            let file_date = match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                Ok(d) => d,
+                Err(e) => {
+                    tracing::warn!("Skipping file {:?}: cannot parse date '{}': {}", path, date_str, e);
+                    continue;
+                }
+            };
+
+            // Compare date
+            if file_date < cutoff {
+                batch.push(path);
+
+                // Batch delete when full
+                if batch.len() >= BATCH_SIZE {
+                    Self::delete_batch(&batch)?;
+                    batch.clear();
                 }
             }
         }
+
+        // Process leftover batch
+        if !batch.is_empty() {
+            Self::delete_batch(&batch)?;
+        }
+
         Ok(())
     }
+
 
     fn get_row_between(
         &self,

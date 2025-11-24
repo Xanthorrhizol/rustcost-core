@@ -1,6 +1,6 @@
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, NaiveDate, Datelike, Utc};
 use std::io::BufWriter;
 use std::{
@@ -23,6 +23,31 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricNodeHourFsAdapter;
 
 impl MetricNodeHourFsAdapter {
+
+    fn delete_batch(batch: &[PathBuf]) -> Result<()> {
+        for path in batch {
+            match fs::remove_file(path) {
+                Ok(_) => tracing::info!("Deleted old metric file {:?}", path),
+                Err(e) => tracing::error!("Failed to delete {:?}: {}", path, e),
+            }
+        }
+        Ok(())
+    }
+
+
+    fn parse_year_month(stem: &str) -> Option<NaiveDate> {
+        let mut parts = stem.split('-');
+
+        let y: i32 = parts.next()?.parse().ok()?;
+        let m: u32 = parts.next()?.parse().ok()?;
+
+        if !(1..=12).contains(&m) {
+            return None;
+        }
+
+        NaiveDate::from_ymd_opt(y, m, 1)
+    }
+
     fn build_path(&self, node_name: &str, date: NaiveDate) -> PathBuf {
         let month_str = date.format("%Y-%m").to_string();
         metric_k8s_node_key_hour_file_path(node_name, &month_str)
@@ -191,33 +216,61 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
         Ok(())
     }
 
-
     fn cleanup_old(&self, node_name: &str, before: DateTime<Utc>) -> Result<()> {
-        let dir = metric_k8s_node_key_hour_dir_path(node_name);
-        if !dir.exists() { return Ok(()); }
+        const BATCH_SIZE: usize = 200;
 
-        let before_month = NaiveDate::from_ymd_opt(before.year(), before.month() as u32, 1)
-            .expect("valid before month date");
+        let dir = metric_k8s_node_key_hour_dir_path(node_name);
+        if !dir.exists() {
+            return Ok(());
+        }
+
+        // Normalize cutoff month (YYYY-MM-01)
+        let before_month = NaiveDate::from_ymd_opt(before.year(), before.month(), 1)
+            .ok_or_else(|| anyhow!("invalid 'before' month ({})-({})", before.year(), before.month()))?;
+
+        let mut batch = Vec::with_capacity(BATCH_SIZE);
 
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("rcd") { continue; }
 
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                let parts: Vec<&str> = stem.split('-').collect();
-                if parts.len() == 2 {
-                    if let (Ok(y), Ok(m)) = (parts[0].parse::<i32>(), parts[1].parse::<u32>()) {
-                        if let Some(file_month) = NaiveDate::from_ymd_opt(y, m, 1) {
-                            if file_month < before_month {
-                                fs::remove_file(&path)
-                                    .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
-                            }
+            // Only *.rcd files
+            if path.extension().and_then(|e| e.to_str()) != Some("rcd") {
+                continue;
+            }
+
+            // Filename -> UTF-8 -> trimmed
+            let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s.trim(),
+                None => {
+                    tracing::warn!("Skipping invalid UTF-8 filename: {:?}", path);
+                    continue;
+                }
+            };
+
+            // Parse YYYY-MM month from filename
+            match Self::parse_year_month(stem) {
+                Some(file_month) => {
+                    if file_month < before_month {
+                        batch.push(path);
+
+                        if batch.len() >= BATCH_SIZE {
+                            Self::delete_batch(&batch)?;
+                            batch.clear();
                         }
                     }
                 }
+                None => {
+                    tracing::warn!("Skipping invalid hour filename '{}'", stem);
+                }
             }
         }
+
+        // Process leftovers
+        if !batch.is_empty() {
+            Self::delete_batch(&batch)?;
+        }
+
         Ok(())
     }
 

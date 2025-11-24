@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{PathBuf};
 
 use anyhow::{ Result};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Utc};
 use tracing::{debug, error};
 
 use crate::core::persistence::metrics::k8s::container::day::metric_container_day_fs_adapter::MetricContainerDayFsAdapter;
@@ -17,7 +17,7 @@ use crate::scheduler::tasks::processors::retention::container::metric_processor_
 use crate::scheduler::tasks::processors::retention::container::metric_processor_retention_container_minute_repository::MetricContainerMinuteRetentionRepositoryImpl;
 
 /// Runs retention cleanup for all containers across minute/hour/day metrics.
-pub async fn run() -> Result<()> {
+pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_before: DateTime<Utc>) -> Result<()> {
     let base_dir = metric_k8s_container_dir_path();
 
     if !base_dir.exists() {
@@ -40,12 +40,6 @@ pub async fn run() -> Result<()> {
     let day_repo = MetricContainerDayRetentionRepositoryImpl { adapter: day_adapter };
     let hour_repo = MetricContainerHourRetentionRepositoryImpl { adapter: hour_adapter };
     let minute_repo = MetricContainerMinuteRetentionRepositoryImpl { adapter: minute_adapter };
-
-    // Retention thresholds
-    let now = Utc::now();
-    let minute_before = now - Duration::days(7);
-    let hour_before = now - Duration::days(30 * 3);
-    let day_before = now - Duration::days(365);
 
     // Run cleanup for each container
     for container_uid in &container_uids {

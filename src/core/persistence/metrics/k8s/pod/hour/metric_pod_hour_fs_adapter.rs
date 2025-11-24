@@ -1,6 +1,6 @@
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow,  Result};
 use chrono::{DateTime, NaiveDate, Datelike, Utc};
 use std::io::BufWriter;
 use std::{
@@ -23,6 +23,19 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricPodHourFsAdapter;
 
 impl MetricPodHourFsAdapter {
+
+    /// Delete a batch of files safely
+    fn delete_batch(batch: &[PathBuf]) -> Result<()> {
+        for path in batch {
+            if let Err(e) = fs::remove_file(path) {
+                // Continue deleting others — best-effort cleanup
+                tracing::error!("Failed to delete {:?}: {}", path, e);
+            } else {
+                tracing::info!("Deleted old metric file {:?}", path);
+            }
+        }
+        Ok(())
+    }
     fn build_path_for(&self, pod_uid: &str, date: NaiveDate) -> PathBuf {
         let month_str = date.format("%Y-%m").to_string();
         metric_k8s_pod_key_hour_file_path(pod_uid, &month_str)
@@ -206,33 +219,89 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
 
 
     fn cleanup_old(&self, pod_uid: &str, before: DateTime<Utc>) -> Result<()> {
+        const BATCH_SIZE: usize = 200;
         let dir = metric_k8s_pod_key_hour_dir_path(pod_uid);
-        if !dir.exists() { return Ok(()); }
+        if !dir.exists() {
+            return Ok(());
+        }
 
-        let before_month = NaiveDate::from_ymd_opt(before.year(), before.month() as u32, 1)
-            .expect("valid before month date");
+        // Normalize cutoff to YYYY-MM-01
+        let before_month = NaiveDate::from_ymd_opt(before.year(), before.month(), 1)
+            .ok_or_else(|| anyhow!("Invalid 'before' month {}-{}", before.year(), before.month()))?;
+
+        let mut batch: Vec<PathBuf> = Vec::with_capacity(BATCH_SIZE);
 
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("rcd") { continue; }
 
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                let parts: Vec<&str> = stem.split('-').collect();
-                if parts.len() == 2 {
-                    if let (Ok(y), Ok(m)) = (parts[0].parse::<i32>(), parts[1].parse::<u32>()) {
-                        if let Some(file_month) = NaiveDate::from_ymd_opt(y, m, 1) {
-                            if file_month < before_month {
-                                fs::remove_file(&path)
-                                    .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
-                            }
-                        }
-                    }
+            // Only process *.rcd
+            if path.extension().and_then(|e| e.to_str()) != Some("rcd") {
+                continue;
+            }
+
+            let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s.trim(),
+                None => {
+                    tracing::warn!(
+                    "Skipping file with non-UTF8 name in {:?}",
+                    path
+                );
+                    continue;
+                }
+            };
+
+            // Expect filename like "2025-02"
+            let parts: Vec<&str> = stem.split('-').collect();
+            if parts.len() != 2 {
+                tracing::warn!("Skipping unexpected filename '{}'", stem);
+                continue;
+            }
+
+            let year: i32 = match parts[0].parse() {
+                Ok(v) => v,
+                Err(_) => {
+                    tracing::warn!("Invalid year '{}' in '{}'", parts[0], stem);
+                    continue;
+                }
+            };
+
+            let month: u32 = match parts[1].parse() {
+                Ok(v) if (1..=12).contains(&v) => v,
+                _ => {
+                    tracing::warn!("Invalid month '{}' in '{}'", parts[1], stem);
+                    continue;
+                }
+            };
+
+            let file_month = match NaiveDate::from_ymd_opt(year, month, 1) {
+                Some(d) => d,
+                None => {
+                    tracing::warn!("Invalid date '{}-{}' in '{}'", year, month, stem);
+                    continue;
+                }
+            };
+
+            // Compare normalized YYYY-MM-01
+            if file_month < before_month {
+                batch.push(path);
+
+                // Batching to avoid blocking for too long
+                if batch.len() >= BATCH_SIZE {
+                    Self::delete_batch(&batch)?;
+                    batch.clear();
                 }
             }
         }
+
+        // Delete remaining
+        if !batch.is_empty() {
+            Self::delete_batch(&batch)?;
+        }
+
         Ok(())
     }
+
 
     fn get_row_between(
         &self,

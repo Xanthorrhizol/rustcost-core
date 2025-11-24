@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 use tracing::log::debug;
-use crate::core::persistence::info::path::{info_k8s_pod_key_dir_path, info_k8s_pod_file_path, info_k8s_container_file_path};
+use crate::core::persistence::info::path::{info_k8s_pod_key_dir_path, info_k8s_pod_file_path};
 
 /// File-based FS adapter for `InfoPodEntity`.
 ///

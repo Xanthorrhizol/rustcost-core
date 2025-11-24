@@ -20,10 +20,9 @@ impl<R: InfoSettingRetentionRepository> RetentionTask<R> {
         let hour_before   = now - Duration::days((settings.hour_retention_months * 30).into());
         let day_before    = now - Duration::days((settings.day_retention_years * 365).into());
 
-        // Pass thresholds to individual processors later!
-        retention::pod::task::run().await?;
-        retention::node::task::run().await?;
-        retention::container::task::run().await?;
+        retention::pod::task::run(minute_before, hour_before, day_before).await?;
+        retention::node::task::run(minute_before, hour_before, day_before).await?;
+        retention::container::task::run(minute_before, hour_before, day_before).await?;
 
         Ok(())
     }

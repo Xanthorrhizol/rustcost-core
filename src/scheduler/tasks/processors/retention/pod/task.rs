@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{ Result};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Utc};
 use tracing::{debug, error};
 
 use crate::core::persistence::metrics::k8s::pod::day::metric_pod_day_fs_adapter::MetricPodDayFsAdapter;
@@ -17,7 +17,7 @@ use crate::scheduler::tasks::processors::retention::pod::metric_processor_retent
 use crate::scheduler::tasks::processors::retention::pod::metric_processor_retention_pod_minute_repository::MetricPodMinuteRetentionRepositoryImpl;
 
 /// Runs retention cleanup for all pods across minute/hour/day metrics.
-pub async fn run() -> Result<()> {
+pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_before: DateTime<Utc>) -> Result<()> {
 
     let base_dir = metric_k8s_pod_dir_path();
 
@@ -41,12 +41,6 @@ pub async fn run() -> Result<()> {
     let day_repo = MetricPodDayRetentionRepositoryImpl { adapter: day_adapter };
     let hour_repo = MetricPodHourRetentionRepositoryImpl { adapter: hour_adapter };
     let minute_repo = MetricPodMinuteRetentionRepositoryImpl { adapter: minute_adapter };
-
-    // Retention thresholds
-    let now = Utc::now();
-    let minute_before = now - Duration::days(7);
-    let hour_before = now - Duration::days(30 * 3);
-    let day_before = now - Duration::days(365);
 
     // Run cleanup for each pod
     for pod_uid in &pod_uids {

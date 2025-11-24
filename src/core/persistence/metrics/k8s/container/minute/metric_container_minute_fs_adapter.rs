@@ -1,6 +1,6 @@
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use crate::core::persistence::metrics::k8s::container::metric_container_entity::MetricContainerEntity;
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use std::io::BufWriter;
 use std::{
@@ -22,6 +22,16 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricContainerMinuteFsAdapter;
 
 impl MetricContainerMinuteFsAdapter {
+    fn delete_batch(batch: &[PathBuf]) -> Result<()> {
+        for path in batch {
+            match fs::remove_file(path) {
+                Ok(_) => tracing::info!("Deleted old container metric {:?}", path),
+                Err(e) => tracing::error!("Failed to delete {:?}: {}", path, e),
+            }
+        }
+        Ok(())
+    }
+
     fn build_path_for(&self, container_key: &str, date: NaiveDate) -> PathBuf {
         let date_str = date.format("%Y-%m-%d").to_string();
         metric_k8s_container_key_minute_file_path(container_key, &date_str)
@@ -113,31 +123,66 @@ impl MetricFsAdapterBase<MetricContainerEntity> for MetricContainerMinuteFsAdapt
     }
 
     fn cleanup_old(&self, container_key: &str, before: DateTime<Utc>) -> Result<()> {
+        const BATCH_SIZE: usize = 200;
+
         let dir = metric_k8s_container_key_minute_dir_path(container_key);
         if !dir.exists() {
             return Ok(());
         }
 
+        let cutoff = before.date_naive();
+        let mut batch: Vec<PathBuf> = Vec::with_capacity(BATCH_SIZE);
+
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
             let path = entry.path();
 
+            // Must be .rcd
             if path.extension().and_then(|e| e.to_str()) != Some("rcd") {
                 continue;
             }
 
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                if let Ok(file_date) = NaiveDate::parse_from_str(stem, "%Y-%m-%d") {
-                    if file_date < before.date_naive() {
-                        fs::remove_file(&path)
-                            .with_context(|| format!("Failed to delete old metric file {:?}", path))?;
-                    }
+            // Extract valid UTF-8 filename stem
+            let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(s) => s.trim(),
+                None => {
+                    tracing::warn!("Skipping invalid UTF-8 file: {:?}", path);
+                    continue;
+                }
+            };
+
+            // Extract YYYY-MM-DD (first 10 chars)
+            let date_str = &stem[..stem.len().min(10)];
+
+            // Parse date
+            let file_date = match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                Ok(d) => d,
+                Err(e) => {
+                    tracing::warn!("Skipping {:?}: invalid date '{}': {}", path, date_str, e);
+                    continue;
+                }
+            };
+
+            // Apply retention
+            if file_date < cutoff {
+                batch.push(path);
+
+                // Flush batch
+                if batch.len() >= BATCH_SIZE {
+                    Self::delete_batch(&batch)?;
+                    batch.clear();
                 }
             }
         }
 
+        // Flush leftovers
+        if !batch.is_empty() {
+            Self::delete_batch(&batch)?;
+        }
+
         Ok(())
     }
+
 
     fn get_row_between(
         &self,
