@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use crate::core::persistence::logs::log_repository::LogRepositoryImpl;
 use crate::domain::system::service::log_service::LogService;
 

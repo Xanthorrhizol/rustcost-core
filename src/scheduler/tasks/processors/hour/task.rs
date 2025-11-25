@@ -1,21 +1,23 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use tracing::{debug};
 use crate::scheduler::tasks::processors::hour::pod::task::process_pod_minute_to_hour;
 use crate::scheduler::tasks::processors::hour::node::task::process_node_minute_to_hour;
 use crate::scheduler::tasks::processors::hour::container::task::process_container_minute_to_hour;
 
-pub async fn run() -> Result<()> {
+pub async fn run(now: DateTime<Utc>) -> Result<()> {
     debug!("Running hour aggregation task...");
 
-    process_pod_minute_to_hour()
-        .await
-        .expect("Failed to process pod minute-to-hour aggregation");
-    process_container_minute_to_hour()
-        .await
-        .expect("Failed to process container minute-to-hour aggregation");
-    process_node_minute_to_hour()
+    process_node_minute_to_hour(now)
         .await
         .expect("Failed to process node minute-to-hour aggregation");
+    process_pod_minute_to_hour(now)
+        .await
+        .expect("Failed to process pod minute-to-hour aggregation");
+    process_container_minute_to_hour(now)
+        .await
+        .expect("Failed to process container minute-to-hour aggregation");
+
 
     Ok(())
 }

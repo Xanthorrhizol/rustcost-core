@@ -1,8 +1,8 @@
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
 use crate::scheduler::tasks::collectors::k8s::summary_dto::{NetworkStats, PodSummary, VolumeStats};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
-pub fn map_pod_summary_to_metrics(pod: &PodSummary) -> MetricPodEntity {
+pub fn map_pod_summary_to_metrics(pod: &PodSummary, now: DateTime<Utc>) -> MetricPodEntity {
     // --- Compute summed physical network stats ---
     let (rx, tx, rx_err, tx_err) = pod
         .network
@@ -18,9 +18,11 @@ pub fn map_pod_summary_to_metrics(pod: &PodSummary) -> MetricPodEntity {
         });
 
     // --- Use CPU timestamp as primary metric timestamp ---
-    let time = chrono::DateTime::parse_from_rfc3339(&pod.cpu.time)
-        .map(|t| t.with_timezone(&Utc))
-        .unwrap_or_else(|_| Utc::now());
+    // let time = chrono::DateTime::parse_from_rfc3339(&pod.cpu.time)
+    //     .map(|t| t.with_timezone(&Utc))
+    //     .unwrap_or_else(|_| now);
+    // collected once per minute so just use now
+    let time = now;
 
     let (
         _es_used,

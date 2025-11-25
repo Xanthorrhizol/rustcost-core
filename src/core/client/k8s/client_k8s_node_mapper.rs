@@ -8,16 +8,16 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::str::FromStr;
 
-pub fn map_summary_to_node_info(summary: &Summary) -> InfoNodeEntity {
+pub fn map_summary_to_node_info(summary: &Summary, now: DateTime<Utc>) -> InfoNodeEntity {
     InfoNodeEntity {
         node_name: Some(summary.node.node_name.clone()),
-        last_updated_info_at: Some(Utc::now().to_rfc3339().parse().unwrap()),
+        last_updated_info_at: Some(now.to_rfc3339().parse().unwrap()),
         ready: Some(true),
         ..Default::default() // leaves all other fields as None
     }
 }
 
-pub fn map_summary_to_metrics(summary: &Summary) -> MetricNodeEntity {
+pub fn map_summary_to_metrics(summary: &Summary, now: DateTime<Utc>) -> MetricNodeEntity {
     let n = &summary.node;
 
     // --- Compute summed physical network stats ---
@@ -26,7 +26,7 @@ pub fn map_summary_to_metrics(summary: &Summary) -> MetricNodeEntity {
         .unwrap_or((None, None, None, None));
 
     MetricNodeEntity {
-        time: Utc::now(),
+        time: now,
 
         // CPU
         cpu_usage_nano_cores: n.cpu.usage_nano_cores,
@@ -70,7 +70,8 @@ fn sum_network_interfaces(net: &NetworkStats) -> Option<(Option<u64>, Option<u64
 
 
 /// Converts a Kubernetes `Node` object into an `InfoNodeEntity`.
-pub fn map_node_to_node_info_entity(node: &Node) -> Result<InfoNodeEntity> {
+pub fn map_node_to_node_info_entity(node: &Node,
+                                    now: DateTime<Utc>,) -> Result<InfoNodeEntity> {
     let metadata = &node.metadata;
     let status = node.status.as_ref();
     let spec = node.spec.as_ref();
@@ -82,7 +83,7 @@ pub fn map_node_to_node_info_entity(node: &Node) -> Result<InfoNodeEntity> {
         .and_then(|ts| DateTime::from_str(ts).ok());
 
     // --- Parse last_updated_info_at (always now)
-    let last_updated_info_at = Some(Utc::now());
+    let last_updated_info_at = Some(now);
 
     // Extract addresses (hostname, internal IP)
     let (hostname, internal_ip) = status

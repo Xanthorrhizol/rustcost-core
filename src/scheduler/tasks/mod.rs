@@ -4,6 +4,7 @@ mod minute;
 mod hour;
 mod day;
 mod info;
+mod utils;
 
 pub use day::run as day_task;
 pub use hour::run as hour_task;

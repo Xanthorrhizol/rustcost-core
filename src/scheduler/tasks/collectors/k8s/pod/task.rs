@@ -7,8 +7,9 @@ use crate::scheduler::tasks::collectors::k8s::pod::metric_pod_minute_collector_m
 use crate::scheduler::tasks::collectors::k8s::pod::metric_pod_minute_collector_repository::MetricPodMinuteCollectorRepositoryImpl;
 use crate::scheduler::tasks::collectors::k8s::summary_dto::Summary;
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 
-pub async fn handle_pod(summary: &Summary) -> Result<bool> {
+pub async fn handle_pod(summary: &Summary, now: DateTime<Utc>) -> Result<bool> {
     let mut any_created = false;
 
     // Step 1: If there are no pods, return early
@@ -39,7 +40,7 @@ pub async fn handle_pod(summary: &Summary) -> Result<bool> {
         let metric_repo = MetricPodMinuteCollectorRepositoryImpl {
             adapter: MetricPodMinuteFsAdapter,
         };
-        let metrics_dto = map_pod_summary_to_metrics(pod);
+        let metrics_dto = map_pod_summary_to_metrics(pod, now);
         metric_repo.append_row(pod_uid, &metrics_dto)?;
     }
 

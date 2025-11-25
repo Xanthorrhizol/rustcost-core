@@ -1,10 +1,12 @@
 use anyhow::Result;
+use chrono::Utc;
 use tracing::{debug, error};
 
 pub async fn run() -> Result<()> {
-    debug!("Running hour task (aggregation + summarization)...");
+    let now = Utc::now();
+    debug!("Running hour scheduler at {}", now);
 
-    if let Err(e) = super::processors::hour::run().await {
+    if let Err(e) = super::processors::hour::run(now).await {
         error!(?e, "hour aggregator failed");
     }
 

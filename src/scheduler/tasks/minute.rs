@@ -1,7 +1,9 @@
 use anyhow::Result;
+use chrono::Utc;
 use tracing::{debug, error};
 
 pub async fn run() -> Result<()> {
+    let now = Utc::now();
     debug!("Running minutely task (collectors + summarizers)...");
 
     // Info check (safe and fast)
@@ -11,11 +13,11 @@ pub async fn run() -> Result<()> {
 
 
     // --- Collectors ---
-    if let Err(e) = super::collectors::k8s::run().await {
+    if let Err(e) = super::collectors::k8s::run(now).await {
         error!(?e, "K8s collector failed");
     }
 
-    if let Err(e) = super::collectors::rustexporter::run().await {
+    if let Err(e) = super::collectors::rustexporter::run(now).await {
         error!(?e, "RustExporter collector failed");
     }
 

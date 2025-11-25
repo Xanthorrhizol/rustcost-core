@@ -4,12 +4,13 @@ use crate::core::persistence::metrics::k8s::container::minute::metric_container_
 use crate::scheduler::tasks::collectors::k8s::container::metric_container_minute_collector_repository::MetricContainerMinuteCollectorRepositoryImpl;
 use crate::scheduler::tasks::collectors::k8s::summary_dto::Summary;
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use crate::scheduler::tasks::collectors::k8s::container::info_container_minute_collector_mapper::map_container_summary_to_info;
 use crate::scheduler::tasks::collectors::k8s::container::info_container_minute_collector_repository::InfoContainerCollectorRepositoryImpl;
 use crate::scheduler::tasks::collectors::k8s::container::metric_container_minute_collector_mapper::map_container_summary_to_metrics;
 
 /// Collects container-level info and metrics from the node summary.
-pub async fn handle_container(summary: &Summary) -> Result<bool> {
+pub async fn handle_container(summary: &Summary, now: DateTime<Utc>) -> Result<bool> {
     let mut any_created = false;
 
     // Step 1: Return early if no pods
@@ -57,7 +58,7 @@ pub async fn handle_container(summary: &Summary) -> Result<bool> {
             let metric_repo = MetricContainerMinuteCollectorRepositoryImpl {
                 adapter: MetricContainerMinuteFsAdapter,
             };
-            let metrics_dto = map_container_summary_to_metrics(container);
+            let metrics_dto = map_container_summary_to_metrics(container, now);
             metric_repo.append_row(&container_key, &metrics_dto)?;
         }
     }

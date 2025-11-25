@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use crate::scheduler::tasks::processors::retention;
 use crate::core::persistence::info::fixed::setting::info_setting_retention_repository_trait::InfoSettingRetentionRepository;
 
@@ -12,10 +12,9 @@ impl<R: InfoSettingRetentionRepository> RetentionTask<R> {
         Self { settings_repo: repo }
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&self, now: DateTime<Utc>) -> Result<()> {
         let settings = self.settings_repo.read()?;  // Load config
 
-        let now = Utc::now();
         let minute_before = now - Duration::days(settings.minute_retention_days.into());
         let hour_before   = now - Duration::days((settings.hour_retention_months * 30).into());
         let day_before    = now - Duration::days((settings.day_retention_years * 365).into());

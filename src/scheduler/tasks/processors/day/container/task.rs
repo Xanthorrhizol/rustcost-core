@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{PathBuf};
 
-use anyhow::{Context, Result};
-use chrono::{Duration, Timelike, Utc};
+use anyhow::{Result};
+use chrono::{DateTime, Utc};
 
 use crate::core::persistence::metrics::k8s::container::day::{
     metric_container_day_fs_adapter::MetricContainerDayFsAdapter,
@@ -11,13 +11,14 @@ use crate::core::persistence::metrics::k8s::container::day::{
 use tracing::{debug};
 use crate::core::persistence::metrics::k8s::path::metric_k8s_container_dir_path;
 use crate::scheduler::tasks::processors::day::container::metric_container_hour_processor_repository::MetricContainerDayProcessorRepositoryImpl;
+use crate::scheduler::tasks::utils::time_util::TimeUtils;
 
 /// Aggregates all containers’ minute-level metrics into dayly metrics.
 ///
 /// This scans `data/metric/container/{container_key}/` and calls `append_row_aggregated()`
 /// for each container directory, generating an dayly summary.
-pub async fn process_container_hour_to_day() -> Result<()> {
-    let (start, end) = previous_day_window()?;
+pub async fn process_container_hour_to_day(now: DateTime<Utc>) -> Result<()> {
+    let (start, end) = TimeUtils::previous_day_window(now);
     let base_dir = metric_k8s_container_dir_path();
 
     if !base_dir.exists() {
@@ -37,18 +38,6 @@ pub async fn process_container_hour_to_day() -> Result<()> {
 
     process_all_containers(&repo, &container_keys, start, end);
     Ok(())
-}
-
-/// Returns the start and end of the previous full day.
-fn previous_day_window() -> Result<(chrono::DateTime<Utc>, chrono::DateTime<Utc>)> {
-    let now = Utc::now();
-    let end = now
-        .with_minute(0)
-        .and_then(|d| d.with_second(0))
-        .and_then(|d| d.with_nanosecond(0))
-        .context("failed to round current time to day")?;
-    let start = end - Duration::days(1);
-    Ok((start, end))
 }
 
 /// Collects all container UIDs (directory names) under the given base directory.

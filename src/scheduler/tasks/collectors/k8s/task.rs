@@ -4,11 +4,12 @@ use crate::scheduler::tasks::collectors::k8s::node::task::{handle_node, update_n
 use crate::scheduler::tasks::collectors::k8s::pod::task::handle_pod;
 use crate::scheduler::tasks::collectors::k8s::summary_dto::Summary;
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use tracing::{debug, error};
 use crate::scheduler::tasks::collectors::k8s::container::task::handle_container;
 
 /// Collects node-level stats from the Kubelet `/stats/summary` endpoint.
-pub async fn run() -> Result<()> {
+pub async fn run(now: DateTime<Utc>) -> Result<()> {
     debug!("Starting K8s node stats task...");
 
     // --- Build client & token ---
@@ -24,12 +25,12 @@ pub async fn run() -> Result<()> {
 
         match fetch_node_summary(&token, &client, &node_name).await {
             Ok(summary) => {
-                match handle_summary(&summary).await {
+                match handle_summary(&summary, now).await {
                     Ok(result) => {
 
                         // if new node
                         if let Some(_name) = result.node_name {
-                            update_node_info(node).await?;
+                            update_node_info(node, now).await?;
                         }
                         // new_pods.extend(result.updated_pods);
                         // new_containers.extend(result.updated_containers);
@@ -54,15 +55,15 @@ pub struct SummaryHandleResultDto {
 
 
 /// Handle and persist one `/stats/summary` response
-pub async fn handle_summary(summary: &Summary) -> Result<SummaryHandleResultDto> {
+pub async fn handle_summary(summary: &Summary, now: DateTime<Utc>) -> Result<SummaryHandleResultDto> {
     let mut result = SummaryHandleResultDto::default();
 
-    if handle_node(summary).await? {
+    if handle_node(summary, now).await? {
         result.node_name = Some(summary.node.node_name.clone());
     }
 
-    handle_pod(summary).await?;
-    handle_container(summary).await?;
+    handle_pod(summary, now).await?;
+    handle_container(summary, now).await?;
 
     Ok(result)
 }

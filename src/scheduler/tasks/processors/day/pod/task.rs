@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{PathBuf};
 
-use anyhow::{Context, Result};
-use chrono::{Duration, Timelike, Utc};
+use anyhow::{ Result};
+use chrono::{DateTime, Utc};
 
 use crate::core::persistence::metrics::k8s::pod::day::{
     metric_pod_day_fs_adapter::MetricPodDayFsAdapter,
@@ -11,13 +11,14 @@ use crate::core::persistence::metrics::k8s::pod::day::{
 use tracing::{debug, error};
 use crate::core::persistence::metrics::k8s::path::metric_k8s_pod_dir_path;
 use crate::scheduler::tasks::processors::day::pod::metric_pod_day_processor_repository::MetricPodDayProcessorRepositoryImpl;
+use crate::scheduler::tasks::utils::time_util::TimeUtils;
 
 /// Aggregates all pods’ minute-level metrics into dayly metrics.
 ///
 /// This scans `data/metric/pod/{pod_uid}/` and calls `append_row_aggregated()`
 /// for each pod directory, generating an dayly summary.
-pub async fn process_pod_hour_to_day() -> Result<()> {
-    let (start, end) = previous_day_window()?;
+pub async fn process_pod_hour_to_day(now: DateTime<Utc>) -> Result<()> {
+    let (start, end) = TimeUtils::previous_day_window(now);
     let base_dir = metric_k8s_pod_dir_path();
 
     if !base_dir.exists() {
@@ -39,17 +40,7 @@ pub async fn process_pod_hour_to_day() -> Result<()> {
     Ok(())
 }
 
-/// Returns the start and end of the previous full day.
-fn previous_day_window() -> Result<(chrono::DateTime<Utc>, chrono::DateTime<Utc>)> {
-    let now = Utc::now();
-    let end = now
-        .with_minute(0)
-        .and_then(|d| d.with_second(0))
-        .and_then(|d| d.with_nanosecond(0))
-        .context("failed to round current time to day")?;
-    let start = end - Duration::days(1);
-    Ok((start, end))
-}
+
 
 /// Collects all pod UIDs (directory names) under the given base directory.
 fn collect_pod_uids(base_dir: &PathBuf) -> Result<Vec<String>> {

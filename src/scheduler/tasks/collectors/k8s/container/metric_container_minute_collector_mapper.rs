@@ -1,13 +1,14 @@
 use crate::core::persistence::metrics::k8s::container::metric_container_entity::MetricContainerEntity;
 use crate::scheduler::tasks::collectors::k8s::summary_dto::{ContainerSummary};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
 /// Maps a Kubernetes ContainerSummary (from Kubelet /stats/summary) into MetricContainerEntity.
-pub fn map_container_summary_to_metrics(container: &ContainerSummary) -> MetricContainerEntity {
+pub fn map_container_summary_to_metrics(container: &ContainerSummary, now: DateTime<Utc>) -> MetricContainerEntity {
     // --- Use CPU timestamp as primary metric timestamp ---
-    let time = chrono::DateTime::parse_from_rfc3339(&container.cpu.time)
-        .map(|t| t.with_timezone(&Utc))
-        .unwrap_or_else(|_| Utc::now());
+    // let time = chrono::DateTime::parse_from_rfc3339(&container.cpu.time)
+    //     .map(|t| t.with_timezone(&Utc))
+    //     .unwrap_or_else(|_| Utc::now());
+    let time = now;
 
     // --- Aggregate ephemeral FS (rootfs + logs) ---
     let (fs_used, fs_capacity, fs_inodes_used, fs_inodes) = sum_fs_stats(container);
