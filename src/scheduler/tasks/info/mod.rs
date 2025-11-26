@@ -2,6 +2,7 @@ use anyhow::Result;
 pub mod version;
 pub mod settings;
 pub mod unit_price;
+pub mod k8s_refresh;
 
 use crate::core::persistence::info::fixed::setting::info_setting_entity::InfoSettingEntity;
 use crate::core::persistence::info::fixed::version::info_version_entity::InfoVersionEntity;

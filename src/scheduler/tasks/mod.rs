@@ -3,7 +3,7 @@ pub mod processors;
 mod minute;
 mod hour;
 mod day;
-mod info;
+pub mod info;
 mod utils;
 
 pub use day::run as day_task;
