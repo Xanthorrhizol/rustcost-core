@@ -10,7 +10,7 @@ use crate::core::persistence::metrics::k8s::pod::day::{
 };
 use tracing::{debug, error};
 use crate::core::persistence::metrics::k8s::path::metric_k8s_pod_dir_path;
-use crate::scheduler::tasks::processors::day::pod::metric_pod_day_processor_repository::MetricPodDayProcessorRepositoryImpl;
+use crate::core::persistence::metrics::k8s::pod::day::metric_pod_day_processor_repository::MetricPodDayProcessorRepositoryImpl;
 use crate::scheduler::tasks::utils::time_util::TimeUtils;
 
 /// Aggregates all pods’ minute-level metrics into dayly metrics.

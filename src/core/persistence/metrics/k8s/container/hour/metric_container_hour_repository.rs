@@ -1,7 +1,6 @@
 use crate::core::persistence::metrics::k8s::container::metric_container_entity::MetricContainerEntity;
 use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_api_repository_trait::MetricContainerHourApiRepository;
 use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_fs_adapter::MetricContainerHourFsAdapter;
-use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_processor_repository_trait::MetricContainerHourProcessorRepository;
 use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_retention_repository_traits::MetricContainerHourRetentionRepository;
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use anyhow::Result;
@@ -45,16 +44,6 @@ impl MetricContainerHourApiRepository for MetricContainerHourRepository {
                 error!(error = %err, container_key, "Failed to read container hour rows");
                 err
             })
-    }
-}
-
-impl MetricContainerHourProcessorRepository for MetricContainerHourRepository {
-    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricContainerEntity> {
-        &self.adapter
-    }
-
-    fn append_row_aggregated(&self, container_key: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> Result<()> {
-        todo!()
     }
 }
 

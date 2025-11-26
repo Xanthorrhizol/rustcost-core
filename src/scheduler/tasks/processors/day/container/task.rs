@@ -4,13 +4,10 @@ use std::path::{PathBuf};
 use anyhow::{Result};
 use chrono::{DateTime, Utc};
 
-use crate::core::persistence::metrics::k8s::container::day::{
-    metric_container_day_fs_adapter::MetricContainerDayFsAdapter,
-    metric_container_day_processor_repository_trait::MetricContainerDayProcessorRepository,
-};
 use tracing::{debug};
+use crate::core::persistence::metrics::k8s::container::day::metric_container_day_processor_repository_trait::MetricContainerDayProcessorRepository;
+use crate::core::persistence::metrics::k8s::container::day::metric_container_day_repository::MetricContainerDayRepository;
 use crate::core::persistence::metrics::k8s::path::metric_k8s_container_dir_path;
-use crate::scheduler::tasks::processors::day::container::metric_container_hour_processor_repository::MetricContainerDayProcessorRepositoryImpl;
 use crate::scheduler::tasks::utils::time_util::TimeUtils;
 
 /// Aggregates all containers’ minute-level metrics into dayly metrics.
@@ -32,9 +29,7 @@ pub async fn process_container_hour_to_day(now: DateTime<Utc>) -> Result<()> {
         return Ok(());
     }
 
-    let repo = MetricContainerDayProcessorRepositoryImpl {
-        adapter: MetricContainerDayFsAdapter,
-    };
+    let repo = MetricContainerDayRepository::default();
 
     process_all_containers(&repo, &container_keys, start, end, now);
     Ok(())

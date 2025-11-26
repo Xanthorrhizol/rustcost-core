@@ -1,6 +1,5 @@
 use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_api_repository_trait::MetricNodeHourApiRepository;
 use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_fs_adapter::MetricNodeHourFsAdapter;
-use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_processor_repository_trait::MetricNodeHourProcessorRepository;
 use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_retention_repository_traits::MetricNodeHourRetentionRepository;
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
@@ -36,16 +35,6 @@ impl MetricNodeHourApiRepository for MetricNodeHourRepository {
             error!(error = %err, node_key, "Failed to read node hour rows");
             err
         })
-    }
-}
-
-impl MetricNodeHourProcessorRepository for MetricNodeHourRepository {
-    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricNodeEntity> {
-        &self.adapter
-    }
-
-    fn append_row_aggregated(&self, node_name: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> Result<()> {
-        todo!()
     }
 }
 

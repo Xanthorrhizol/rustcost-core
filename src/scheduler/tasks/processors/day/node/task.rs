@@ -5,12 +5,11 @@ use anyhow::{Result};
 use chrono::{DateTime,  Utc};
 
 use crate::core::persistence::metrics::k8s::node::day::{
-    metric_node_day_fs_adapter::MetricNodeDayFsAdapter,
     metric_node_day_processor_repository_trait::MetricNodeDayProcessorRepository,
 };
 use tracing::{debug, error};
+use crate::core::persistence::metrics::k8s::node::day::metric_node_day_repository::MetricNodeDayRepository;
 use crate::core::persistence::metrics::k8s::path::metric_k8s_node_dir_path;
-use crate::scheduler::tasks::processors::day::node::metric_node_day_processor_repository::MetricNodeDayProcessorRepositoryImpl;
 use crate::scheduler::tasks::utils::time_util::TimeUtils;
 
 /// Aggregates all nodes’ minute-level metrics into dayly metrics.
@@ -32,9 +31,7 @@ pub async fn process_node_hour_to_day(now: DateTime<Utc>) -> Result<()> {
         return Ok(());
     }
 
-    let repo = MetricNodeDayProcessorRepositoryImpl {
-        adapter: MetricNodeDayFsAdapter,
-    };
+    let repo = MetricNodeDayRepository::default();
 
     process_all_nodes(&repo, &node_names, start, end, now);
     Ok(())

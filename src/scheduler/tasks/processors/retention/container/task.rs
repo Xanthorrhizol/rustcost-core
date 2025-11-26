@@ -5,16 +5,15 @@ use anyhow::{ Result};
 use chrono::{DateTime, Utc};
 use tracing::{debug, error};
 
-use crate::core::persistence::metrics::k8s::container::day::metric_container_day_fs_adapter::MetricContainerDayFsAdapter;
+use crate::core::persistence::metrics::k8s::container::day::metric_container_day_repository::MetricContainerDayRepository;
 use crate::core::persistence::metrics::k8s::container::day::metric_container_day_retention_repository_traits::MetricContainerDayRetentionRepository;
 use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_fs_adapter::MetricContainerHourFsAdapter;
 use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_retention_repository_traits::MetricContainerHourRetentionRepository;
+use crate::core::persistence::metrics::k8s::container::hour::metric_processor_retention_container_hour_repository::MetricContainerHourRetentionRepositoryImpl;
 use crate::core::persistence::metrics::k8s::container::minute::metric_container_minute_fs_adapter::MetricContainerMinuteFsAdapter;
 use crate::core::persistence::metrics::k8s::container::minute::metric_container_minute_retention_repository_traits::MetricContainerMinuteRetentionRepository;
+use crate::core::persistence::metrics::k8s::container::minute::metric_processor_retention_container_minute_repository::MetricContainerMinuteRetentionRepositoryImpl;
 use crate::core::persistence::metrics::k8s::path::metric_k8s_container_dir_path;
-use crate::scheduler::tasks::processors::retention::container::metric_processor_retention_container_day_repository::MetricContainerDayRetentionRepositoryImpl;
-use crate::scheduler::tasks::processors::retention::container::metric_processor_retention_container_hour_repository::MetricContainerHourRetentionRepositoryImpl;
-use crate::scheduler::tasks::processors::retention::container::metric_processor_retention_container_minute_repository::MetricContainerMinuteRetentionRepositoryImpl;
 
 /// Runs retention cleanup for all containers across minute/hour/day metrics.
 pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_before: DateTime<Utc>) -> Result<()> {
@@ -32,12 +31,11 @@ pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_b
     }
 
     // Create adapters (stateless, no constructor needed)
-    let day_adapter = MetricContainerDayFsAdapter;
     let hour_adapter = MetricContainerHourFsAdapter;
     let minute_adapter = MetricContainerMinuteFsAdapter;
 
     // Create repositories
-    let day_repo = MetricContainerDayRetentionRepositoryImpl { adapter: day_adapter };
+    let day_repo = MetricContainerDayRepository::default();
     let hour_repo = MetricContainerHourRetentionRepositoryImpl { adapter: hour_adapter };
     let minute_repo = MetricContainerMinuteRetentionRepositoryImpl { adapter: minute_adapter };
 

@@ -1,6 +1,5 @@
 use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_api_repository_trait::MetricPodHourApiRepository;
 use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_fs_adapter::MetricPodHourFsAdapter;
-use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_processor_repository_trait::MetricPodHourProcessorRepository;
 use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_retention_repository_traits::MetricPodHourRetentionRepository;
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
@@ -45,16 +44,6 @@ impl MetricPodHourApiRepository for MetricPodHourRepository {
                 error!(error = %err, pod_name, "Failed to read pod hour rows");
                 err
             })
-    }
-}
-
-impl MetricPodHourProcessorRepository for MetricPodHourRepository {
-    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricPodEntity> {
-        &self.adapter
-    }
-
-    fn append_row_aggregated(&self, pod_uid: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> Result<()> {
-        todo!()
     }
 }
 

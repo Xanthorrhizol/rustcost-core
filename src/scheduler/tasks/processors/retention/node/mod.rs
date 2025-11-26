@@ -1,4 +1,1 @@
 pub mod task;
-pub mod metric_processor_retention_node_hour_repository;
-pub mod metric_processor_retention_node_day_repository;
-pub mod metric_processor_retention_node_minute_repository;

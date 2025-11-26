@@ -8,7 +8,7 @@ use crate::core::persistence::metrics::k8s::container::hour::{
     metric_container_hour_fs_adapter::MetricContainerHourFsAdapter,
     metric_container_hour_processor_repository_trait::MetricContainerHourProcessorRepository,
 };
-use crate::scheduler::tasks::processors::hour::container::metric_container_hour_processor_repository::MetricContainerHourProcessorRepositoryImpl;
+use crate::core::persistence::metrics::k8s::container::hour::metric_container_hour_processor_repository::MetricContainerHourProcessorRepositoryImpl;
 use tracing::{debug};
 use crate::core::persistence::metrics::k8s::path::metric_k8s_container_dir_path;
 use crate::scheduler::tasks::utils::time_util::TimeUtils;

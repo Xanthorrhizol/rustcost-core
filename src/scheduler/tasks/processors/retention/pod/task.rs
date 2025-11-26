@@ -12,9 +12,9 @@ use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_retention
 use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_fs_adapter::MetricPodMinuteFsAdapter;
 use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_retention_repository_traits::MetricPodMinuteRetentionRepository;
 use crate::core::persistence::metrics::k8s::path::metric_k8s_pod_dir_path;
-use crate::scheduler::tasks::processors::retention::pod::metric_processor_retention_pod_day_repository::MetricPodDayRetentionRepositoryImpl;
-use crate::scheduler::tasks::processors::retention::pod::metric_processor_retention_pod_hour_repository::MetricPodHourRetentionRepositoryImpl;
-use crate::scheduler::tasks::processors::retention::pod::metric_processor_retention_pod_minute_repository::MetricPodMinuteRetentionRepositoryImpl;
+use crate::core::persistence::metrics::k8s::pod::day::metric_processor_retention_pod_day_repository::MetricPodDayRetentionRepositoryImpl;
+use crate::core::persistence::metrics::k8s::pod::hour::metric_processor_retention_pod_hour_repository::MetricPodHourRetentionRepositoryImpl;
+use crate::core::persistence::metrics::k8s::pod::minute::metric_processor_retention_pod_minute_repository::MetricPodMinuteRetentionRepositoryImpl;
 
 /// Runs retention cleanup for all pods across minute/hour/day metrics.
 pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_before: DateTime<Utc>) -> Result<()> {

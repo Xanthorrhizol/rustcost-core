@@ -4,3 +4,4 @@ pub mod metric_node_minute_collector_repository_trait;
 pub mod metric_node_minute_processor_repository_trait;
 pub mod metric_node_minute_retention_repository_traits;
 pub mod metric_node_minute_repository;
+pub mod metric_processor_retention_node_minute_repository;

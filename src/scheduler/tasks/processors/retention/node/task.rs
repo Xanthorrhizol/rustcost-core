@@ -6,15 +6,15 @@ use chrono::{DateTime, Utc};
 use tracing::{debug, error};
 
 use crate::core::persistence::metrics::k8s::node::day::metric_node_day_fs_adapter::MetricNodeDayFsAdapter;
+use crate::core::persistence::metrics::k8s::node::day::metric_node_day_repository::MetricNodeDayRepository;
 use crate::core::persistence::metrics::k8s::node::day::metric_node_day_retention_repository_traits::MetricNodeDayRetentionRepository;
 use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_fs_adapter::MetricNodeHourFsAdapter;
 use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_retention_repository_traits::MetricNodeHourRetentionRepository;
 use crate::core::persistence::metrics::k8s::node::minute::metric_node_minute_fs_adapter::MetricNodeMinuteFsAdapter;
 use crate::core::persistence::metrics::k8s::node::minute::metric_node_minute_retention_repository_traits::MetricNodeMinuteRetentionRepository;
 use crate::core::persistence::metrics::k8s::path::metric_k8s_node_dir_path;
-use crate::scheduler::tasks::processors::retention::node::metric_processor_retention_node_day_repository::MetricNodeDayRetentionRepositoryImpl;
-use crate::scheduler::tasks::processors::retention::node::metric_processor_retention_node_hour_repository::MetricNodeHourRetentionRepositoryImpl;
-use crate::scheduler::tasks::processors::retention::node::metric_processor_retention_node_minute_repository::MetricNodeMinuteRetentionRepositoryImpl;
+use crate::core::persistence::metrics::k8s::node::hour::metric_processor_retention_node_hour_repository::MetricNodeHourRetentionRepositoryImpl;
+use crate::core::persistence::metrics::k8s::node::minute::metric_processor_retention_node_minute_repository::MetricNodeMinuteRetentionRepositoryImpl;
 
 /// Runs retention cleanup for all nodes across minute/hour/day metrics.
 pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_before: DateTime<Utc>) -> Result<()> {
@@ -32,12 +32,11 @@ pub async fn run(minute_before: DateTime<Utc>, hour_before: DateTime<Utc>, day_b
     }
 
     // Create adapters (stateless, no constructor needed)
-    let day_adapter = MetricNodeDayFsAdapter;
     let hour_adapter = MetricNodeHourFsAdapter;
     let minute_adapter = MetricNodeMinuteFsAdapter;
 
     // Create repositories
-    let day_repo = MetricNodeDayRetentionRepositoryImpl { adapter: day_adapter };
+    let day_repo = MetricNodeDayRepository::default();
     let hour_repo = MetricNodeHourRetentionRepositoryImpl { adapter: hour_adapter };
     let minute_repo = MetricNodeMinuteRetentionRepositoryImpl { adapter: minute_adapter };
 

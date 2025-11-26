@@ -1,12 +1,12 @@
 use crate::core::persistence::metrics::k8s::node::day::metric_node_day_api_repository_trait::MetricNodeDayApiRepository;
 use crate::core::persistence::metrics::k8s::node::day::metric_node_day_fs_adapter::MetricNodeDayFsAdapter;
-use crate::core::persistence::metrics::k8s::node::day::metric_node_day_processor_repository_trait::MetricNodeDayProcessorRepository;
 use crate::core::persistence::metrics::k8s::node::day::metric_node_day_retention_repository_traits::MetricNodeDayRetentionRepository;
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use tracing::error;
+use crate::core::persistence::metrics::k8s::node::day::metric_node_day_processor_repository_trait::MetricNodeDayProcessorRepository;
 
 pub struct MetricNodeDayRepository {
     adapter: MetricNodeDayFsAdapter,
@@ -39,16 +39,6 @@ impl MetricNodeDayApiRepository for MetricNodeDayRepository {
     }
 }
 
-impl MetricNodeDayProcessorRepository for MetricNodeDayRepository {
-    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricNodeEntity> {
-        &self.adapter
-    }
-
-    fn append_row_aggregated(&self, node_key: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> Result<()> {
-        todo!()
-    }
-}
-
 impl MetricNodeDayRetentionRepository for MetricNodeDayRepository {
     fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricNodeEntity> {
         &self.adapter
@@ -59,5 +49,14 @@ impl MetricNodeDayRetentionRepository for MetricNodeDayRepository {
             error!(error = %err, node_name, "Failed to cleanup old node day metrics");
             err
         })
+    }
+}
+impl MetricNodeDayProcessorRepository for MetricNodeDayRepository  {
+    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricNodeEntity> {
+        &self.adapter
+    }
+
+    fn append_row_aggregated(&self, node_uid: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> anyhow::Result<()> {
+        self.adapter.append_row_aggregated(node_uid, start, end, now)
     }
 }

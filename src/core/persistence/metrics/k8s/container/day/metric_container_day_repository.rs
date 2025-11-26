@@ -1,12 +1,12 @@
 use crate::core::persistence::metrics::k8s::container::day::metric_container_day_api_repository_trait::MetricContainerDayApiRepository;
 use crate::core::persistence::metrics::k8s::container::day::metric_container_day_fs_adapter::MetricContainerDayFsAdapter;
-use crate::core::persistence::metrics::k8s::container::day::metric_container_day_processor_repository_trait::MetricContainerDayProcessorRepository;
 use crate::core::persistence::metrics::k8s::container::day::metric_container_day_retention_repository_traits::MetricContainerDayRetentionRepository;
 use crate::core::persistence::metrics::k8s::container::metric_container_entity::MetricContainerEntity;
 use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use tracing::error;
+use crate::core::persistence::metrics::k8s::container::day::metric_container_day_processor_repository_trait::MetricContainerDayProcessorRepository;
 
 pub struct MetricContainerDayRepository {
     adapter: MetricContainerDayFsAdapter,
@@ -48,16 +48,6 @@ impl MetricContainerDayApiRepository for MetricContainerDayRepository {
     }
 }
 
-impl MetricContainerDayProcessorRepository for MetricContainerDayRepository {
-    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricContainerEntity> {
-        &self.adapter
-    }
-
-    fn append_row_aggregated(&self, container_key: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> Result<()> {
-        todo!()
-    }
-}
-
 impl MetricContainerDayRetentionRepository for MetricContainerDayRepository {
     fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricContainerEntity> {
         &self.adapter
@@ -68,5 +58,15 @@ impl MetricContainerDayRetentionRepository for MetricContainerDayRepository {
             error!(error = %err, container_key, "Failed to cleanup old container day metrics");
             err
         })
+    }
+}
+
+impl MetricContainerDayProcessorRepository for MetricContainerDayRepository  {
+    fn fs_adapter(&self) -> &dyn MetricFsAdapterBase<MetricContainerEntity> {
+        &self.adapter
+    }
+
+    fn append_row_aggregated(&self, container_uid: &str, start: DateTime<Utc>, end: DateTime<Utc>, now: DateTime<Utc>) -> anyhow::Result<()> {
+        self.adapter.append_row_aggregated(container_uid, start, end, now)
     }
 }

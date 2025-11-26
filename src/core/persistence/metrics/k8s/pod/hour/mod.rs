@@ -3,3 +3,5 @@ pub mod metric_pod_hour_processor_repository_trait;
 pub mod metric_pod_hour_retention_repository_traits;
 pub mod metric_pod_hour_api_repository_trait;
 pub mod metric_pod_hour_repository;
+pub mod metric_pod_hour_processor_repository;
+pub mod metric_processor_retention_pod_hour_repository;
