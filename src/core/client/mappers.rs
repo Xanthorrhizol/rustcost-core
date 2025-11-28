@@ -1,6 +1,5 @@
 /// Maps kube-rs / k8s-openapi types → internal domain models
-use crate::core::client::kube_resources::{Node, Pod, Deployment, Namespace, HorizontalPodAutoscaler,
-    PersistentVolume, PersistentVolumeClaim, ResourceQuota, LimitRange};
+use crate::core::client::kube_resources::{Node, Pod, Deployment, Namespace};
 use crate::core::persistence::info::k8s::node::info_node_entity::InfoNodeEntity;
 use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
 use crate::core::persistence::info::k8s::deployment::info_deployment_entity::InfoDeploymentEntity;
@@ -9,7 +8,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 
 /// Converts a k8s-openapi Node object into an InfoNodeEntity
-pub fn map_node_to_info_entity(node: &Node) -> Result<InfoNodeEntity> {
+pub fn map_node_to_info_entity(node: &Node, now: DateTime<Utc>) -> Result<InfoNodeEntity> {
     let metadata = &node.metadata;
     let status = node.status.as_ref();
     let spec = node.spec.as_ref();
@@ -22,7 +21,7 @@ pub fn map_node_to_info_entity(node: &Node) -> Result<InfoNodeEntity> {
         .and_then(|r| r.ok())
         .map(|dt| dt.with_timezone(&Utc));
 
-    let last_updated_info_at = Some(Utc::now());
+    let last_updated_info_at = Some(now);
 
     // Extract addresses (hostname, internal IP)
     let (hostname, internal_ip) = status

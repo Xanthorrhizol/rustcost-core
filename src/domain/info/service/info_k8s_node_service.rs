@@ -32,7 +32,7 @@ pub async fn get_info_k8s_node(node_name: String) -> Result<InfoNodeEntity> {
 
         // Fetch from K8s API
         let node = fetch_node_by_name(&client, &node_name).await?;
-        let updated_entity = map_node_to_info_entity(&node)?;
+        let updated_entity = map_node_to_info_entity(&node, now)?;
 
         // Save refreshed info
         repo.update(&updated_entity)?;
@@ -75,7 +75,7 @@ pub async fn list_k8s_nodes() -> Result<Vec<InfoNodeEntity>> {
 
                 if let Ok(existing) = repo.read(&node_name) {
                     if let Some(ts) = existing.last_updated_info_at {
-                        if Utc::now().signed_duration_since(ts) <= Duration::hours(1) {
+                        if now.signed_duration_since(ts) <= Duration::hours(1) {
                             debug!("✅ Using cached node info for '{}'", node_name);
                             cached_entities.push(existing);
                             continue;
@@ -107,7 +107,7 @@ pub async fn list_k8s_nodes() -> Result<Vec<InfoNodeEntity>> {
         let node_name = node.metadata.name.clone().unwrap_or_default();
 
         // Map API → entity
-        let mapped = map_node_to_info_entity(&node)?;
+        let mapped = map_node_to_info_entity(&node, now)?;
 
         // If cache exists → merge
         let merged = if let Ok(mut existing) = repo.read(&node_name) {

@@ -4,7 +4,6 @@ use serde_json::to_string_pretty;
 use tracing::debug;
 
 use crate::api::dto::info_dto::K8sListQuery;
-use crate::core::client::k8s::client_k8s_container_mapper::map_container_status_to_info_container_entity;
 use crate::core::client::k8s::client_k8s_pod::{fetch_pod_by_name_and_namespace, fetch_pods, fetch_pods_by_namespace, fetch_pods_by_node};
 use crate::core::client::k8s::util::{build_client, read_token};
 use crate::core::persistence::info::k8s::container::info_container_api_repository_trait::InfoContainerApiRepository;

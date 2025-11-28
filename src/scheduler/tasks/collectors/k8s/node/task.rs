@@ -40,7 +40,7 @@ pub async fn update_node_info(
 
     let repo = InfoNodeCollectorRepositoryImpl::default();
 
-    let node_info = map_node_to_info_entity(&node)?;
+    let node_info = map_node_to_info_entity(&node, now)?;
 
     repo.update(&node_info)
         .expect("Failed to update node info in InfoNodeCollectorRepository");

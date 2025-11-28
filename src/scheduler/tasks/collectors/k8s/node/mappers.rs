@@ -3,18 +3,18 @@
 use crate::core::persistence::info::k8s::node::info_node_entity::InfoNodeEntity;
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
 use crate::scheduler::tasks::collectors::k8s::summary_dto::{NetworkStats, Summary};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
-pub fn map_summary_to_node_info(summary: &Summary) -> InfoNodeEntity {
+pub fn map_summary_to_node_info(summary: &Summary, now: DateTime<Utc>) -> InfoNodeEntity {
     InfoNodeEntity {
         node_name: Some(summary.node.node_name.clone()),
-        last_updated_info_at: Some(Utc::now()),
+        last_updated_info_at: Some(now),
         ready: Some(true),
         ..Default::default() // leaves all other fields as None
     }
 }
 
-pub fn map_summary_to_metrics(summary: &Summary) -> MetricNodeEntity {
+pub fn map_summary_to_metrics(summary: &Summary, now: DateTime<Utc>) -> MetricNodeEntity {
     let n = &summary.node;
 
     // --- Compute summed physical network stats ---
@@ -23,7 +23,7 @@ pub fn map_summary_to_metrics(summary: &Summary) -> MetricNodeEntity {
         .unwrap_or((None, None, None, None));
 
     MetricNodeEntity {
-        time: Utc::now(),
+        time: now,
 
         // CPU
         cpu_usage_nano_cores: n.cpu.usage_nano_cores,

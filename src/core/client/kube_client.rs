@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kube::{Client, Config};
+use kube::{Client};
 use std::env;
 use tracing::debug;
 
