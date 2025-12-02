@@ -125,7 +125,15 @@ impl<R: K8sRuntimeStateRepositoryTrait> K8sRuntimeStateManager<R> {
     }
 
     // ===============================================
-    // 6. Get all namespaces
+    // 6b. Get all deployments
+    // ===============================================
+    pub async fn get_deployments(&self) -> Vec<String> {
+        let state = self.repo.get().await;
+        state.deployments.clone()
+    }
+
+    // ===============================================
+    // 7. Get all namespaces
     // ===============================================
     pub async fn get_namespaces(&self) -> Vec<String> {
         let state = self.repo.get().await;
@@ -133,7 +141,15 @@ impl<R: K8sRuntimeStateRepositoryTrait> K8sRuntimeStateManager<R> {
     }
 
     // ===============================================
-    // 7. Get all containers for a pod UID
+    // 8. Get all pods (UIDs)
+    // ===============================================
+    pub async fn get_pods(&self) -> Vec<String> {
+        let state = self.repo.get().await;
+        state.pods.keys().cloned().collect()
+    }
+
+    // ===============================================
+    // 9. Get all containers for a pod UID
     // ===============================================
     pub async fn get_containers(&self, pod_uid: &str) -> Vec<String> {
         let state = self.repo.get().await;
@@ -142,5 +158,21 @@ impl<R: K8sRuntimeStateRepositoryTrait> K8sRuntimeStateManager<R> {
             .get(pod_uid)
             .map(|p| p.containers.clone())
             .unwrap_or_default()
+    }
+
+    // ===============================================
+    // 10. Get all container keys (pod_uid-container_name)
+    // ===============================================
+    pub async fn get_container_keys(&self) -> Vec<String> {
+        let state = self.repo.get().await;
+        state
+            .pods
+            .values()
+            .flat_map(|pod| {
+                pod.containers
+                    .iter()
+                    .map(move |c| format!("{}-{}", pod.uid, c))
+            })
+            .collect()
     }
 }

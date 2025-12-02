@@ -14,17 +14,21 @@ impl K8sPodMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
-        to_json(state.metric_service.get_metric_k8s_pods_raw(q).await)
+        state.k8s_state.ensure_resynced().await?;
+        let pod_uids = state.k8s_state.get_pods().await;
+        to_json(state.metric_service.get_metric_k8s_pods_raw(q, pod_uids).await)
     }
 
     pub async fn get_metric_k8s_pods_raw_summary(
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let pod_uids = state.k8s_state.get_pods().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_pods_raw_summary(q)
+                .get_metric_k8s_pods_raw_summary(q, pod_uids)
                 .await,
         )
     }
@@ -33,10 +37,12 @@ impl K8sPodMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let pod_uids = state.k8s_state.get_pods().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_pods_raw_efficiency(q)
+                .get_metric_k8s_pods_raw_efficiency(q, pod_uids)
                 .await,
         )
     }
@@ -46,6 +52,7 @@ impl K8sPodMetricsController {
         Path(pod_uid): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -59,6 +66,7 @@ impl K8sPodMetricsController {
         Path(pod_uid): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -72,6 +80,7 @@ impl K8sPodMetricsController {
         Path(pod_uid): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -84,17 +93,21 @@ impl K8sPodMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
-        to_json(state.metric_service.get_metric_k8s_pods_cost(q).await)
+        state.k8s_state.ensure_resynced().await?;
+        let pod_uids = state.k8s_state.get_pods().await;
+        to_json(state.metric_service.get_metric_k8s_pods_cost(q, pod_uids).await)
     }
 
     pub async fn get_metric_k8s_pods_cost_summary(
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let pod_uids = state.k8s_state.get_pods().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_pods_cost_summary(q)
+                .get_metric_k8s_pods_cost_summary(q, pod_uids)
                 .await,
         )
     }
@@ -103,10 +116,12 @@ impl K8sPodMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let pod_uids = state.k8s_state.get_pods().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_pods_cost_trend(q)
+                .get_metric_k8s_pods_cost_trend(q, pod_uids)
                 .await,
         )
     }
@@ -116,6 +131,7 @@ impl K8sPodMetricsController {
         Path(pod_uid): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -129,6 +145,7 @@ impl K8sPodMetricsController {
         Path(pod_uid): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -142,6 +159,7 @@ impl K8sPodMetricsController {
         Path(pod_uid): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service

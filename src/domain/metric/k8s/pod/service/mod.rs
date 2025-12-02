@@ -1,17 +1,18 @@
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::collections::HashSet;
-
 use crate::api::dto::{info_dto::K8sListQuery, metrics_dto::RangeQuery};
 use crate::core::persistence::info::fixed::unit_price::info_unit_price_entity::InfoUnitPriceEntity;
 use crate::core::persistence::info::k8s::container::info_container_entity::InfoContainerEntity;
+use crate::core::persistence::info::k8s::pod::info_pod_api_repository_trait::InfoPodApiRepository;
 use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
+use crate::core::persistence::info::k8s::pod::info_pod_repository::InfoPodRepository;
 use crate::core::persistence::metrics::k8s::pod::day::metric_pod_day_api_repository_trait::MetricPodDayApiRepository;
 use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_api_repository_trait::MetricPodHourApiRepository;
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
 use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_api_repository_trait::MetricPodMinuteApiRepository;
 use crate::domain::info::service::{
-    info_k8s_container_service, info_k8s_pod_service, info_unit_price_service,
+    info_k8s_container_service, info_unit_price_service,
 };
 use crate::domain::metric::k8s::common::dto::{
     CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricScope, MetricSeriesDto,
@@ -84,26 +85,26 @@ fn metric_pod_entity_to_point(entity: MetricPodEntity) -> UniversalMetricPointDt
 
 async fn build_pod_raw_data(
     q: RangeQuery,
-    target_pod_uid: Option<String>,
+    pod_uids: Vec<String>,
 ) -> Result<(MetricGetResponseDto, Vec<InfoPodEntity>)> {
-    let mut pod_infos = if let Some(pod_uid) = target_pod_uid.clone() {
-        vec![info_k8s_pod_service::get_info_k8s_pod(pod_uid).await?]
-    } else {
-        info_k8s_pod_service::list_k8s_pods(K8sListQuery {
-            namespace: q.namespace.clone(),
-            label_selector: None,
-            node_name: None,
-        })
-        .await?
-    };
-    // 2. Apply team/service/env filtering
-    // Helper closure for matching a field
+
+    let repo = InfoPodRepository::new();
+    let mut pod_infos = Vec::new();
+
+    // --- load from repo only, no fetch, no cache refresh ---
+    for uid in pod_uids {
+        if let Ok(entity) = repo.read(&uid) {
+            pod_infos.push(entity);
+        }
+    }
+
+    // --- filters ---
     let matches = |value: &Option<String>, filter: &str| {
         value
             .as_deref()
             .map(|v| {
                 v.split(',')
-                    .any(|x| x.trim().eq_ignore_ascii_case(filter.trim()))
+                    .any(|x| x.trim().eq_ignore_ascii_case(filter))
             })
             .unwrap_or(false)
     };
@@ -120,11 +121,13 @@ async fn build_pod_raw_data(
         pod_infos.retain(|p| matches(&p.env, env));
     }
 
+    // --- build metrics ---
+    let response = build_pod_series_for_infos(&q, &pod_infos, None)?;
 
-    // 3. Build metric series based on the filtered pods
-    let response = build_pod_series_for_infos(&q, &pod_infos, target_pod_uid.clone())?;
     Ok((response, pod_infos))
 }
+
+
 
 fn build_pod_series_for_infos(
     q: &RangeQuery,
@@ -216,26 +219,28 @@ fn sum_container_requests(
 
 async fn build_pod_cost_response(
     q: RangeQuery,
-    target: Option<String>,
+    pod_uids: Vec<String>,
     unit_prices: InfoUnitPriceEntity,
 ) -> Result<MetricGetResponseDto> {
-    let (mut response, _) = build_pod_raw_data(q, target).await?;
+    let (mut response, _) = build_pod_raw_data(q, pod_uids).await?;
     apply_costs(&mut response, &unit_prices);
     Ok(response)
 }
 
-pub async fn get_metric_k8s_pods_raw(q: RangeQuery) -> Result<Value> {
-    let (response, _) = build_pod_raw_data(q, None).await?;
+pub async fn get_metric_k8s_pods_raw(
+    q: RangeQuery,
+    pod_uids: Vec<String>) -> Result<Value> {
+    let (response, _) = build_pod_raw_data(q, pod_uids).await?;
     Ok(serde_json::to_value(response)?)
 }
 
-pub async fn get_metric_k8s_pods_raw_summary(q: RangeQuery) -> Result<Value> {
-    let (response, pod_infos) = build_pod_raw_data(q, None).await?;
+pub async fn get_metric_k8s_pods_raw_summary(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
+    let (response, pod_infos) = build_pod_raw_data(q, pod_uids).await?;
     build_raw_summary_value(&response, MetricScope::Pod, pod_infos.len())
 }
 
-pub async fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery) -> Result<Value> {
-    let (response, pod_infos) = build_pod_raw_data(q.clone(), None).await?;
+pub async fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
+    let (response, pod_infos) = build_pod_raw_data(q.clone(), pod_uids).await?;
     let summary_value = build_raw_summary_value(&response, MetricScope::Pod, pod_infos.len())?;
     let summary: MetricRawSummaryResponseDto = serde_json::from_value(summary_value)?;
 
@@ -266,17 +271,20 @@ pub async fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery) -> Result<Value> 
 }
 
 pub async fn get_metric_k8s_pod_raw(pod_uid: String, q: RangeQuery) -> Result<Value> {
-    let (response, _) = build_pod_raw_data(q, Some(pod_uid)).await?;
+    let pod_uids = vec![pod_uid];
+    let (response, _) = build_pod_raw_data(q, pod_uids).await?;
     Ok(serde_json::to_value(response)?)
 }
 
 pub async fn get_metric_k8s_pod_raw_summary(pod_uid: String, q: RangeQuery) -> Result<Value> {
-    let (response, _) = build_pod_raw_data(q, Some(pod_uid)).await?;
+    let pod_uids = vec![pod_uid];
+    let (response, _) = build_pod_raw_data(q, pod_uids).await?;
     build_raw_summary_value(&response, MetricScope::Pod, 1)
 }
 
 pub async fn get_metric_k8s_pod_raw_efficiency(pod_uid: String, q: RangeQuery) -> Result<Value> {
-    let (response, pod_infos) = build_pod_raw_data(q.clone(), Some(pod_uid.clone())).await?;
+    let pod_uids = vec![pod_uid.clone()];
+    let (response, pod_infos) = build_pod_raw_data(q.clone(), pod_uids).await?;
     let summary_value = build_raw_summary_value(&response, MetricScope::Pod, 1)?;
     let summary: MetricRawSummaryResponseDto = serde_json::from_value(summary_value)?;
 
@@ -306,43 +314,46 @@ pub async fn get_metric_k8s_pod_raw_efficiency(pod_uid: String, q: RangeQuery) -
     )
 }
 
-pub async fn get_metric_k8s_pods_cost(q: RangeQuery) -> Result<Value> {
+pub async fn get_metric_k8s_pods_cost(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let response = build_pod_cost_response(q, None, unit_prices).await?;
+    let response = build_pod_cost_response(q, pod_uids, unit_prices).await?;
     Ok(serde_json::to_value(response)?)
 }
 
-pub async fn get_metric_k8s_pods_cost_summary(q: RangeQuery) -> Result<Value> {
+pub async fn get_metric_k8s_pods_cost_summary(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let response = build_pod_cost_response(q, None, unit_prices.clone()).await?;
+    let response = build_pod_cost_response(q, pod_uids, unit_prices.clone()).await?;
     let dto = build_cost_summary_dto(&response, MetricScope::Pod, None, &unit_prices);
     Ok(serde_json::to_value(dto)?)
 }
 
-pub async fn get_metric_k8s_pods_cost_trend(q: RangeQuery) -> Result<Value> {
+pub async fn get_metric_k8s_pods_cost_trend(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let response = build_pod_cost_response(q, None, unit_prices).await?;
+    let response = build_pod_cost_response(q, pod_uids, unit_prices).await?;
     let dto = build_cost_trend_dto(&response, MetricScope::Pod, None)?;
     Ok(serde_json::to_value(dto)?)
 }
 
 pub async fn get_metric_k8s_pod_cost(pod_uid: String, q: RangeQuery) -> Result<Value> {
+    let pod_uids = vec![pod_uid];
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let response = build_pod_cost_response(q, Some(pod_uid.clone()), unit_prices).await?;
+    let response = build_pod_cost_response(q, pod_uids, unit_prices).await?;
     Ok(serde_json::to_value(response)?)
 }
 
 pub async fn get_metric_k8s_pod_cost_summary(pod_uid: String, q: RangeQuery) -> Result<Value> {
+    let pod_uids = vec![pod_uid.clone()];
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
     let response =
-        build_pod_cost_response(q, Some(pod_uid.clone()), unit_prices.clone()).await?;
+        build_pod_cost_response(q, pod_uids, unit_prices.clone()).await?;
     let dto = build_cost_summary_dto(&response, MetricScope::Pod, Some(pod_uid), &unit_prices);
     Ok(serde_json::to_value(dto)?)
 }
 
 pub async fn get_metric_k8s_pod_cost_trend(pod_uid: String, q: RangeQuery) -> Result<Value> {
+    let pod_uids = vec![pod_uid.clone()];
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let response = build_pod_cost_response(q, Some(pod_uid.clone()), unit_prices).await?;
+    let response = build_pod_cost_response(q, pod_uids, unit_prices).await?;
     let dto = build_cost_trend_dto(&response, MetricScope::Pod, Some(pod_uid))?;
     Ok(serde_json::to_value(dto)?)
 }

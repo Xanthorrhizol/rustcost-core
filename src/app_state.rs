@@ -222,81 +222,81 @@ pub struct MetricService;
 
 impl MetricService {
     delegate_async_service! {
-        fn get_metric_k8s_pods_raw(q: RangeQuery) -> serde_json::Value => get_metric_k8s_pods_raw;
-        fn get_metric_k8s_pods_raw_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_pods_raw_summary;
-        fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery) -> serde_json::Value => get_metric_k8s_pods_raw_efficiency;
+        fn get_metric_k8s_pods_raw(q: RangeQuery, pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_raw;
+        fn get_metric_k8s_pods_raw_summary(q: RangeQuery, pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_raw_summary;
+        fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_raw_efficiency;
 
         fn get_metric_k8s_pod_raw(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_raw;
         fn get_metric_k8s_pod_raw_summary(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_raw_summary;
         fn get_metric_k8s_pod_raw_efficiency(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_raw_efficiency;
 
-        fn get_metric_k8s_pods_cost(q: RangeQuery) -> serde_json::Value => get_metric_k8s_pods_cost;
-        fn get_metric_k8s_pods_cost_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_pods_cost_summary;
-        fn get_metric_k8s_pods_cost_trend(q: RangeQuery) -> serde_json::Value => get_metric_k8s_pods_cost_trend;
+        fn get_metric_k8s_pods_cost(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_cost;
+        fn get_metric_k8s_pods_cost_summary(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_cost_summary;
+        fn get_metric_k8s_pods_cost_trend(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_cost_trend;
 
         fn get_metric_k8s_pod_cost(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_cost;
         fn get_metric_k8s_pod_cost_summary(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_cost_summary;
         fn get_metric_k8s_pod_cost_trend(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_cost_trend;
 
-        fn get_metric_k8s_nodes_raw(q: RangeQuery) -> serde_json::Value => get_metric_k8s_nodes_raw;
-        fn get_metric_k8s_nodes_raw_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_nodes_raw_summary;
-        fn get_metric_k8s_nodes_raw_efficiency(q: RangeQuery) -> serde_json::Value => get_metric_k8s_nodes_raw_efficiency;
+        fn get_metric_k8s_nodes_raw(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_raw;
+        fn get_metric_k8s_nodes_raw_summary(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_raw_summary;
+        fn get_metric_k8s_nodes_raw_efficiency(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_raw_efficiency;
 
         fn get_metric_k8s_node_raw(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_raw;
         fn get_metric_k8s_node_raw_summary(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_raw_summary;
         fn get_metric_k8s_node_raw_efficiency(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_raw_efficiency;
 
-        fn get_metric_k8s_nodes_cost(q: RangeQuery) -> serde_json::Value => get_metric_k8s_nodes_cost;
-        fn get_metric_k8s_nodes_cost_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_nodes_cost_summary;
-        fn get_metric_k8s_nodes_cost_trend(q: RangeQuery) -> serde_json::Value => get_metric_k8s_nodes_cost_trend;
+        fn get_metric_k8s_nodes_cost(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_cost;
+        fn get_metric_k8s_nodes_cost_summary(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_cost_summary;
+        fn get_metric_k8s_nodes_cost_trend(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_cost_trend;
 
         fn get_metric_k8s_node_cost(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_cost;
         fn get_metric_k8s_node_cost_summary(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_cost_summary;
         fn get_metric_k8s_node_cost_trend(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_cost_trend;
 
-        fn get_metric_k8s_namespaces_raw(q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespaces_raw;
-        fn get_metric_k8s_namespaces_raw_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespaces_raw_summary;
-        fn get_metric_k8s_namespaces_raw_efficiency(q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespaces_raw_efficiency;
+        fn get_metric_k8s_namespaces_raw(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_raw;
+        fn get_metric_k8s_namespaces_raw_summary(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_raw_summary;
+        fn get_metric_k8s_namespaces_raw_efficiency(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_raw_efficiency;
 
         fn get_metric_k8s_namespace_raw(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_raw;
         fn get_metric_k8s_namespace_raw_summary(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_raw_summary;
         fn get_metric_k8s_namespace_raw_efficiency(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_raw_efficiency;
 
-        fn get_metric_k8s_namespaces_cost(q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespaces_cost;
-        fn get_metric_k8s_namespaces_cost_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespaces_cost_summary;
-        fn get_metric_k8s_namespaces_cost_trend(q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespaces_cost_trend;
+        fn get_metric_k8s_namespaces_cost(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_cost;
+        fn get_metric_k8s_namespaces_cost_summary(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_cost_summary;
+        fn get_metric_k8s_namespaces_cost_trend(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_cost_trend;
 
         fn get_metric_k8s_namespace_cost(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_cost;
         fn get_metric_k8s_namespace_cost_summary(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_cost_summary;
         fn get_metric_k8s_namespace_cost_trend(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_cost_trend;
 
-        fn get_metric_k8s_deployments_raw(q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployments_raw;
-        fn get_metric_k8s_deployments_raw_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployments_raw_summary;
-        fn get_metric_k8s_deployments_raw_efficiency(q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployments_raw_efficiency;
+        fn get_metric_k8s_deployments_raw(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_raw;
+        fn get_metric_k8s_deployments_raw_summary(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_raw_summary;
+        fn get_metric_k8s_deployments_raw_efficiency(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_raw_efficiency;
 
         fn get_metric_k8s_deployment_raw(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_raw;
         fn get_metric_k8s_deployment_raw_summary(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_raw_summary;
         fn get_metric_k8s_deployment_raw_efficiency(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_raw_efficiency;
 
-        fn get_metric_k8s_deployments_cost(q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployments_cost;
-        fn get_metric_k8s_deployments_cost_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployments_cost_summary;
-        fn get_metric_k8s_deployments_cost_trend(q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployments_cost_trend;
+        fn get_metric_k8s_deployments_cost(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_cost;
+        fn get_metric_k8s_deployments_cost_summary(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_cost_summary;
+        fn get_metric_k8s_deployments_cost_trend(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_cost_trend;
 
         fn get_metric_k8s_deployment_cost(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_cost;
         fn get_metric_k8s_deployment_cost_summary(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_cost_summary;
         fn get_metric_k8s_deployment_cost_trend(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_cost_trend;
 
-        fn get_metric_k8s_containers_raw(q: RangeQuery) -> serde_json::Value => get_metric_k8s_containers_raw;
-        fn get_metric_k8s_containers_raw_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_containers_raw_summary;
-        fn get_metric_k8s_containers_raw_efficiency(q: RangeQuery) -> serde_json::Value => get_metric_k8s_containers_raw_efficiency;
+        fn get_metric_k8s_containers_raw(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_raw;
+        fn get_metric_k8s_containers_raw_summary(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_raw_summary;
+        fn get_metric_k8s_containers_raw_efficiency(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_raw_efficiency;
 
         fn get_metric_k8s_container_raw(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_raw;
         fn get_metric_k8s_container_raw_summary(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_raw_summary;
         fn get_metric_k8s_container_raw_efficiency(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_raw_efficiency;
 
-        fn get_metric_k8s_containers_cost(q: RangeQuery) -> serde_json::Value => get_metric_k8s_containers_cost;
-        fn get_metric_k8s_containers_cost_summary(q: RangeQuery) -> serde_json::Value => get_metric_k8s_containers_cost_summary;
-        fn get_metric_k8s_containers_cost_trend(q: RangeQuery) -> serde_json::Value => get_metric_k8s_containers_cost_trend;
+        fn get_metric_k8s_containers_cost(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_cost;
+        fn get_metric_k8s_containers_cost_summary(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_cost_summary;
+        fn get_metric_k8s_containers_cost_trend(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_cost_trend;
 
         fn get_metric_k8s_container_cost(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_cost;
         fn get_metric_k8s_container_cost_summary(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_cost_summary;
@@ -323,7 +323,6 @@ impl MetricService {
         q: RangeQuery,
         node_names: Vec<String>
     ) -> anyhow::Result<serde_json::Value> {
-        let nodes = list_k8s_nodes().await?;
         get_metric_k8s_cluster_raw_summary(node_names, q).await
     }
 

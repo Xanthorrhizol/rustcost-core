@@ -16,10 +16,12 @@ impl K8sDeploymentMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let deployment_names = state.k8s_state.get_deployments().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_deployments_raw(q)
+                .get_metric_k8s_deployments_raw(q, deployment_names)
                 .await,
         )
     }
@@ -28,10 +30,12 @@ impl K8sDeploymentMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let deployment_names = state.k8s_state.get_deployments().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_deployments_raw_summary(q)
+                .get_metric_k8s_deployments_raw_summary(q, deployment_names)
                 .await,
         )
     }
@@ -40,10 +44,12 @@ impl K8sDeploymentMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let deployment_names = state.k8s_state.get_deployments().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_deployments_raw_efficiency(q)
+                .get_metric_k8s_deployments_raw_efficiency(q, deployment_names)
                 .await,
         )
     }
@@ -53,6 +59,7 @@ impl K8sDeploymentMetricsController {
         Path(deployment): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -66,6 +73,7 @@ impl K8sDeploymentMetricsController {
         Path(deployment): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -79,6 +87,7 @@ impl K8sDeploymentMetricsController {
         Path(deployment): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -91,10 +100,12 @@ impl K8sDeploymentMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let deployment_names = state.k8s_state.get_deployments().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_deployments_cost(q)
+                .get_metric_k8s_deployments_cost(q, deployment_names)
                 .await,
         )
     }
@@ -103,10 +114,12 @@ impl K8sDeploymentMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let deployment_names = state.k8s_state.get_deployments().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_deployments_cost_summary(q)
+                .get_metric_k8s_deployments_cost_summary(q, deployment_names)
                 .await,
         )
     }
@@ -115,10 +128,12 @@ impl K8sDeploymentMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let deployment_names = state.k8s_state.get_deployments().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_deployments_cost_trend(q)
+                .get_metric_k8s_deployments_cost_trend(q, deployment_names)
                 .await,
         )
     }
@@ -128,6 +143,7 @@ impl K8sDeploymentMetricsController {
         Path(deployment): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -141,6 +157,7 @@ impl K8sDeploymentMetricsController {
         Path(deployment): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -154,6 +171,7 @@ impl K8sDeploymentMetricsController {
         Path(deployment): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service

@@ -16,10 +16,12 @@ impl K8sNamespaceMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let ns_names = state.k8s_state.get_namespaces().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_namespaces_raw(q)
+                .get_metric_k8s_namespaces_raw(q, ns_names)
                 .await,
         )
     }
@@ -28,10 +30,12 @@ impl K8sNamespaceMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let ns_names = state.k8s_state.get_namespaces().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_namespaces_raw_summary(q)
+                .get_metric_k8s_namespaces_raw_summary(q, ns_names)
                 .await,
         )
     }
@@ -40,10 +44,12 @@ impl K8sNamespaceMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let ns_names = state.k8s_state.get_namespaces().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_namespaces_raw_efficiency(q)
+                .get_metric_k8s_namespaces_raw_efficiency(q, ns_names)
                 .await,
         )
     }
@@ -53,6 +59,7 @@ impl K8sNamespaceMetricsController {
         Path(namespace): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -66,6 +73,7 @@ impl K8sNamespaceMetricsController {
         Path(namespace): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -79,6 +87,7 @@ impl K8sNamespaceMetricsController {
         Path(namespace): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -91,10 +100,12 @@ impl K8sNamespaceMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let ns_names = state.k8s_state.get_namespaces().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_namespaces_cost(q)
+                .get_metric_k8s_namespaces_cost(q, ns_names)
                 .await,
         )
     }
@@ -103,10 +114,12 @@ impl K8sNamespaceMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let ns_names = state.k8s_state.get_namespaces().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_namespaces_cost_summary(q)
+                .get_metric_k8s_namespaces_cost_summary(q, ns_names)
                 .await,
         )
     }
@@ -115,10 +128,12 @@ impl K8sNamespaceMetricsController {
         State(state): State<AppState>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
+        let ns_names = state.k8s_state.get_namespaces().await;
         to_json(
             state
                 .metric_service
-                .get_metric_k8s_namespaces_cost_trend(q)
+                .get_metric_k8s_namespaces_cost_trend(q, ns_names)
                 .await,
         )
     }
@@ -128,6 +143,7 @@ impl K8sNamespaceMetricsController {
         Path(namespace): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -141,6 +157,7 @@ impl K8sNamespaceMetricsController {
         Path(namespace): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service
@@ -154,6 +171,7 @@ impl K8sNamespaceMetricsController {
         Path(namespace): Path<String>,
         Query(q): Query<RangeQuery>,
     ) -> Result<Json<ApiResponse<Value>>, AppError> {
+        state.k8s_state.ensure_resynced().await?;
         to_json(
             state
                 .metric_service

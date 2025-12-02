@@ -1,44 +1,105 @@
 use anyhow::{anyhow, Result};
-use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, Utc};
-use crate::api::dto::{info_dto::K8sListQuery, metrics_dto::RangeQuery};
-use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
-use crate::domain::info::service::{info_k8s_pod_service, info_unit_price_service};
-use crate::domain::metric::k8s::common::dto::{CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricScope, MetricSeriesDto, NetworkMetricDto, UniversalMetricPointDto};
-use crate::domain::metric::k8s::common::service_helpers::{aggregate_cost_points, apply_costs, build_cost_summary_dto, build_cost_trend_dto, build_raw_summary_value};
+use serde_json::{json, Value};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    fs,
+};
+
+use crate::api::dto::metrics_dto::RangeQuery;
+use crate::core::persistence::info::{
+    k8s::pod::{info_pod_entity::InfoPodEntity, info_pod_repository::InfoPodRepository},
+    path::info_k8s_pod_dir_path,
+};
+use crate::core::persistence::info::k8s::pod::info_pod_api_repository_trait::InfoPodApiRepository;
+use crate::domain::info::service::info_unit_price_service;
+
+use crate::domain::metric::k8s::common::dto::{
+    FilesystemMetricDto, MetricGetResponseDto, MetricScope,
+    MetricSeriesDto, NetworkMetricDto, UniversalMetricPointDto,
+};
+use crate::domain::metric::k8s::common::service_helpers::{
+    apply_costs, build_cost_summary_dto, build_cost_trend_dto, build_raw_summary_value,
+};
+
 use crate::domain::metric::k8s::pod::service::build_pod_response_from_infos;
 
-fn group_pods_by_namespace(pods: Vec<InfoPodEntity>) -> HashMap<String, Vec<InfoPodEntity>> {
-    let mut map: HashMap<String, Vec<InfoPodEntity>> = HashMap::new();
-    for pod in pods {
-        if let Some(ns) = &pod.namespace {
-            map.entry(ns.clone()).or_default().push(pod);
+// =====================================================================
+// HELPERS
+// =====================================================================
+
+/// Load pods grouped by namespace from the local repository.
+fn load_pods_by_namespace(namespaces: &[String]) -> Result<HashMap<String, Vec<InfoPodEntity>>> {
+    let mut map = HashMap::new();
+    let dir = info_k8s_pod_dir_path();
+
+    if !dir.exists() {
+        return Ok(map);
+    }
+
+    let filters: HashSet<String> = namespaces.iter().cloned().collect();
+    let allow_all = filters.is_empty();
+    let repo = InfoPodRepository::new();
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let pod_uid = entry.file_name().to_string_lossy().to_string();
+
+        if let Ok(pod) = repo.read(&pod_uid) {
+            if let Some(ns) = pod.namespace.clone() {
+                if allow_all || filters.contains(&ns) {
+                    map.entry(ns).or_default().push(pod);
+                }
+            }
         }
     }
-    map
+
+    Ok(map)
 }
+
+/// Load all pods for a specific namespace (errors if none found).
+fn namespace_pods(ns: &str) -> Result<Vec<InfoPodEntity>> {
+    let map = load_pods_by_namespace(&[ns.to_string()])?;
+
+    if let Some(pods) = map.get(ns) {
+        if !pods.is_empty() {
+            return Ok(pods.clone());
+        }
+    }
+
+    Err(anyhow!("namespace '{}' has no pods", ns))
+}
+
+fn all_pods_for(namespaces: &[String]) -> Result<Vec<InfoPodEntity>> {
+    let map = load_pods_by_namespace(namespaces)?;
+    Ok(map.into_values().flatten().collect())
+}
+
+
+// =====================================================================
+// NAMESPACE AGGREGATION
+// =====================================================================
 
 fn build_namespace_response(
     namespace: &str,
-    per_pod_response: &MetricGetResponseDto,
+    per_pod: &MetricGetResponseDto,
 ) -> MetricGetResponseDto {
     let all_points: Vec<UniversalMetricPointDto> =
-        per_pod_response.series.iter().flat_map(|s| s.points.clone()).collect();
+        per_pod.series.iter().flat_map(|s| s.points.clone()).collect();
 
-    let aggregated_points = aggregate_namespace_points(all_points);
+    let aggregated = aggregate_namespace_points(all_points);
 
     MetricGetResponseDto {
-        start: per_pod_response.start,
-        end: per_pod_response.end,
+        start: per_pod.start,
+        end: per_pod.end,
         scope: "namespace".to_string(),
         target: Some(namespace.to_string()),
-        granularity: per_pod_response.granularity.clone(),
+        granularity: per_pod.granularity.clone(),
         series: vec![MetricSeriesDto {
             key: namespace.to_string(),
             name: namespace.to_string(),
             scope: MetricScope::Namespace,
-            points: aggregated_points,
+            points: aggregated,
         }],
         total: None,
         limit: None,
@@ -46,17 +107,11 @@ fn build_namespace_response(
     }
 }
 
-/// Aggregate namespace-level metrics by summing pod-level points per timestamp.
-///
-/// Behavior:
-/// - CPU & Memory: SUM — represents the total resource usage of the namespace
-/// - Filesystem: SUM — total usage across pods
-/// - Network: SUM — total traffic per namespace
-///
-/// Null Handling Rules:
-/// - Null values are skipped during aggregation
-/// - If all values for a field are null → output will be null
-/// - Zero (0) is treated as a valid data point (not null)
+
+// =====================================================================
+// NAMESPACE MULTI-POINT AGGREGATION
+// =====================================================================
+
 pub fn aggregate_namespace_points(
     points: Vec<UniversalMetricPointDto>,
 ) -> Vec<UniversalMetricPointDto> {
@@ -68,245 +123,141 @@ pub fn aggregate_namespace_points(
 
     let mut out = Vec::with_capacity(buckets.len());
 
-    for (time, bucket) in buckets {
-        // CPU / Memory
-        let mut cpu_sum = 0.0;
-        let mut cpu_count = 0.0;
+    for (time, list) in buckets {
 
-        let mut cpu_core_sum = 0.0;
-        let mut cpu_core_count = 0.0;
+        let mut acc = UniversalMetricPointDto {
+            time,
+            ..Default::default()
+        };
 
-        let mut mem_sum = 0.0;
-        let mut mem_count = 0.0;
-
-        let mut mem_working_sum = 0.0;
-        let mut mem_working_count = 0.0;
-
-        let mut mem_rss_sum = 0.0;
-        let mut mem_rss_count = 0.0;
-
-        let mut mem_pf_sum = 0.0;
-        let mut mem_pf_count = 0.0;
-
-        // Filesystem SUM
-        let mut fs_used_sum = 0.0;
-        let mut fs_used_count = 0.0;
-        let mut fs_capacity_sum = 0.0;
-        let mut fs_capacity_count = 0.0;
-        let mut fs_inodes_used_sum = 0.0;
-        let mut fs_inodes_used_count = 0.0;
-        let mut fs_inodes_sum = 0.0;
-        let mut fs_inodes_count = 0.0;
-
-        // Network SUM
-        let mut rx_sum = 0.0;
-        let mut rx_count = 0.0;
-        let mut tx_sum = 0.0;
-        let mut tx_count = 0.0;
-        let mut rx_err_sum = 0.0;
-        let mut rx_err_count = 0.0;
-        let mut tx_err_sum = 0.0;
-        let mut tx_err_count = 0.0;
-
-        for p in &bucket {
-            // CPU
-            if let Some(v) = p.cpu_memory.cpu_usage_nano_cores {
-                cpu_sum += v;
-                cpu_count += 1.0;
+        let sum   = |slot: &mut Option<f64>, v: Option<f64>| {
+            if let Some(n) = v {
+                *slot = Some(slot.unwrap_or(0.0) + n);
             }
-            if let Some(v) = p.cpu_memory.cpu_usage_core_nano_seconds {
-                cpu_core_sum += v;
-                cpu_core_count += 1.0;
+        };
+
+        for p in list {
+            sum(&mut acc.cpu_memory.cpu_usage_nano_cores, p.cpu_memory.cpu_usage_nano_cores);
+            sum(&mut acc.cpu_memory.cpu_usage_core_nano_seconds, p.cpu_memory.cpu_usage_core_nano_seconds);
+
+            sum(&mut acc.cpu_memory.memory_usage_bytes, p.cpu_memory.memory_usage_bytes);
+            sum(&mut acc.cpu_memory.memory_working_set_bytes, p.cpu_memory.memory_working_set_bytes);
+            sum(&mut acc.cpu_memory.memory_rss_bytes, p.cpu_memory.memory_rss_bytes);
+            sum(&mut acc.cpu_memory.memory_page_faults, p.cpu_memory.memory_page_faults);
+
+            if let Some(fs) = p.filesystem.as_ref() {
+                let outfs = acc.filesystem.get_or_insert(FilesystemMetricDto::default());
+                sum(&mut outfs.used_bytes, fs.used_bytes);
+                sum(&mut outfs.capacity_bytes, fs.capacity_bytes);
+                sum(&mut outfs.inodes_used, fs.inodes_used);
+                sum(&mut outfs.inodes, fs.inodes);
             }
 
-            // MEMORY
-            if let Some(v) = p.cpu_memory.memory_usage_bytes {
-                mem_sum += v;
-                mem_count += 1.0;
-            }
-            if let Some(v) = p.cpu_memory.memory_working_set_bytes {
-                mem_working_sum += v;
-                mem_working_count += 1.0;
-            }
-            if let Some(v) = p.cpu_memory.memory_rss_bytes {
-                mem_rss_sum += v;
-                mem_rss_count += 1.0;
-            }
-            if let Some(v) = p.cpu_memory.memory_page_faults {
-                mem_pf_sum += v;
-                mem_pf_count += 1.0;
-            }
-
-            // FILESYSTEM (SUM)
-            if let Some(fs) = &p.filesystem {
-                if let Some(v) = fs.used_bytes {
-                    fs_used_sum += v;
-                    fs_used_count += 1.0;
-                }
-                if let Some(v) = fs.capacity_bytes {
-                    fs_capacity_sum += v;
-                    fs_capacity_count += 1.0;
-                }
-                if let Some(v) = fs.inodes_used {
-                    fs_inodes_used_sum += v;
-                    fs_inodes_used_count += 1.0;
-                }
-                if let Some(v) = fs.inodes {
-                    fs_inodes_sum += v;
-                    fs_inodes_count += 1.0;
-                }
-            }
-
-            // NETWORK (SUM)
-            if let Some(net) = &p.network {
-                if let Some(v) = net.rx_bytes {
-                    rx_sum += v;
-                    rx_count += 1.0;
-                }
-                if let Some(v) = net.tx_bytes {
-                    tx_sum += v;
-                    tx_count += 1.0;
-                }
-                if let Some(v) = net.rx_errors {
-                    rx_err_sum += v;
-                    rx_err_count += 1.0;
-                }
-                if let Some(v) = net.tx_errors {
-                    tx_err_sum += v;
-                    tx_err_count += 1.0;
-                }
+            if let Some(net) = p.network.as_ref() {
+                let outnet = acc.network.get_or_insert(NetworkMetricDto::default());
+                sum(&mut outnet.rx_bytes, net.rx_bytes);
+                sum(&mut outnet.tx_bytes, net.tx_bytes);
+                sum(&mut outnet.rx_errors, net.rx_errors);
+                sum(&mut outnet.tx_errors, net.tx_errors);
             }
         }
 
-        out.push(UniversalMetricPointDto {
-            time,
-            cpu_memory: CommonMetricValuesDto {
-                cpu_usage_nano_cores: (cpu_count > 0.0).then_some(cpu_sum),
-                cpu_usage_core_nano_seconds: (cpu_core_count > 0.0).then_some(cpu_core_sum),
-                memory_usage_bytes: (mem_count > 0.0).then_some(mem_sum),
-                memory_working_set_bytes: (mem_working_count > 0.0).then_some(mem_working_sum),
-                memory_rss_bytes: (mem_rss_count > 0.0).then_some(mem_rss_sum),
-                memory_page_faults: (mem_pf_count > 0.0).then_some(mem_pf_sum),
-                ..Default::default()
-            },
-            filesystem: Some(FilesystemMetricDto {
-                used_bytes: (fs_used_count > 0.0).then_some(fs_used_sum),
-                capacity_bytes: (fs_capacity_count > 0.0).then_some(fs_capacity_sum),
-                inodes_used: (fs_inodes_used_count > 0.0).then_some(fs_inodes_used_sum),
-                inodes: (fs_inodes_count > 0.0).then_some(fs_inodes_sum),
-                ..Default::default()
-            }),
-            network: Some(NetworkMetricDto {
-                rx_bytes: (rx_count > 0.0).then_some(rx_sum),
-                tx_bytes: (tx_count > 0.0).then_some(tx_sum),
-                rx_errors: (rx_err_count > 0.0).then_some(rx_err_sum),
-                tx_errors: (tx_err_count > 0.0).then_some(tx_err_sum),
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
+        out.push(acc);
     }
 
     out
 }
 
 
-async fn build_namespace_cost_response(
-    namespace: &str,
-    mut per_pod_response: MetricGetResponseDto,
-) -> Result<MetricGetResponseDto> {
-    let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    apply_costs(&mut per_pod_response, &unit_prices);
-    let points = aggregate_cost_points(&per_pod_response.series);
+// =====================================================================
+// RAW METRICS: MULTIPLE NAMESPACES
+// =====================================================================
 
-    Ok(MetricGetResponseDto {
-        start: per_pod_response.start,
-        end: per_pod_response.end,
-        scope: "namespace".to_string(),
-        target: Some(namespace.to_string()),
-        granularity: per_pod_response.granularity,
-        series: vec![MetricSeriesDto {
-            key: namespace.to_string(),
-            name: namespace.to_string(),
-            scope: MetricScope::Namespace,
-            points,
-        }],
-        total: None,
-        limit: None,
-        offset: None,
-    })
-}
+pub async fn get_metric_k8s_namespaces_raw(
+    q: RangeQuery,
+    namespaces: Vec<String>
+) -> Result<Value> {
 
-async fn namespace_pods(namespace: &str) -> Result<Vec<InfoPodEntity>> {
-    let pods = info_k8s_pod_service::list_k8s_pods(K8sListQuery {
-        namespace: Some(namespace.to_string()),
-        label_selector: None,
-        node_name: None,
-    })
-    .await?;
+    let ns_map = load_pods_by_namespace(&namespaces)?;
 
-    if pods.is_empty() {
-        return Err(anyhow!("namespace '{}' has no pods", namespace));
-    }
-
-    Ok(pods)
-}
-
-pub async fn get_metric_k8s_namespaces_raw(q: RangeQuery) -> Result<Value> {
-    let all_pods = info_k8s_pod_service::list_k8s_pods(K8sListQuery {
-        namespace: None,
-        label_selector: None,
-        node_name: None,
-    })
-    .await?;
-
-    let ns_map = group_pods_by_namespace(all_pods);
-    if ns_map.is_empty() {
-        return Ok(json!({ "status": "no data" }));
-    }
+    let targets =
+        if namespaces.is_empty() {
+            ns_map.keys().cloned().collect::<Vec<_>>()
+        } else {
+            namespaces
+        };
 
     let mut series = Vec::new();
-    let mut base_response: Option<MetricGetResponseDto> = None;
+    let mut base_resp = None;
 
-    for (ns, pods) in ns_map {
-        let per_pod = build_pod_response_from_infos(q.clone(), pods, Some(ns.clone()))?;
-        let aggregated = build_namespace_response(&ns, &per_pod);
-        if base_response.is_none() {
-            base_response = Some(aggregated.clone());
+    for ns in targets {
+        if let Some(pods) = ns_map.get(&ns) {
+            if pods.is_empty() {
+                continue;
+            }
+            let per_pod = build_pod_response_from_infos(q.clone(), pods.clone(), Some(ns.clone()))?;
+            let aggregated = build_namespace_response(&ns, &per_pod);
+
+            if base_resp.is_none() {
+                base_resp = Some(aggregated.clone());
+            }
+            series.push(aggregated.series[0].clone());
         }
-        series.push(aggregated.series[0].clone());
     }
 
-    if let Some(mut base) = base_response {
-        base.target = None;
+    if let Some(mut base) = base_resp {
         base.series = series;
+        base.target = None;
+
         return Ok(serde_json::to_value(base)?);
     }
 
     Ok(json!({ "status": "no data" }))
 }
 
-pub async fn get_metric_k8s_namespace_raw(namespace: String, q: RangeQuery) -> Result<Value> {
-    let pods = namespace_pods(&namespace).await?;
-    let per_pod = build_pod_response_from_infos(q, pods, Some(namespace.clone()))?;
-    let aggregated = build_namespace_response(&namespace, &per_pod);
+
+// =====================================================================
+// RAW METRICS: SINGLE NAMESPACE
+// =====================================================================
+
+pub async fn get_metric_k8s_namespace_raw(
+    ns: String,
+    q: RangeQuery
+) -> Result<Value> {
+
+    let pods = namespace_pods(&ns)?;
+    let per_pod = build_pod_response_from_infos(q, pods, Some(ns.clone()))?;
+    let aggregated = build_namespace_response(&ns, &per_pod);
+
     Ok(serde_json::to_value(aggregated)?)
 }
 
-pub async fn get_metric_k8s_namespace_raw_summary(namespace: String, q: RangeQuery) -> Result<Value> {
-    let pods = namespace_pods(&namespace).await?;
-    let per_pod = build_pod_response_from_infos(q, pods.clone(), Some(namespace.clone()))?;
-    let aggregated = build_namespace_response(&namespace, &per_pod);
-    build_raw_summary_value(&aggregated, MetricScope::Namespace, pods.len())
-}
 
-pub async fn get_metric_k8s_namespaces_raw_summary(q: RangeQuery) -> Result<Value> {
-    let all_pods = info_k8s_pod_service::list_k8s_pods(K8sListQuery {
-        namespace: None,
-        label_selector: None,
-        node_name: None,
-    })
-    .await?;
+// =====================================================================
+// RAW SUMMARY
+// =====================================================================
+
+pub async fn get_metric_k8s_namespaces_raw_summary(
+    q: RangeQuery,
+    namespaces: Vec<String>
+) -> Result<Value> {
+
+    let ns_map = load_pods_by_namespace(&namespaces)?;
+
+    let targets =
+        if namespaces.is_empty() {
+            ns_map.keys().cloned().collect::<Vec<_>>()
+        } else {
+            namespaces
+        };
+
+    let mut all_pods = Vec::new();
+
+    for ns in targets {
+        if let Some(pods) = ns_map.get(&ns) {
+            all_pods.extend(pods.clone());
+        }
+    }
 
     if all_pods.is_empty() {
         return Ok(json!({ "status": "no data" }));
@@ -314,36 +265,62 @@ pub async fn get_metric_k8s_namespaces_raw_summary(q: RangeQuery) -> Result<Valu
 
     let per_pod = build_pod_response_from_infos(q, all_pods.clone(), None)?;
     let aggregated = build_namespace_response("all", &per_pod);
+
     build_raw_summary_value(&aggregated, MetricScope::Namespace, all_pods.len())
 }
 
-pub async fn get_metric_k8s_namespace_raw_efficiency(_namespace: String, _q: RangeQuery) -> Result<Value> {
+
+pub async fn get_metric_k8s_namespace_raw_summary(
+    ns: String,
+    q: RangeQuery
+) -> Result<Value> {
+
+    let pods = namespace_pods(&ns)?;
+    let per_pod = build_pod_response_from_infos(q, pods.clone(), Some(ns.clone()))?;
+    let aggregated = build_namespace_response(&ns, &per_pod);
+
+    build_raw_summary_value(&aggregated, MetricScope::Namespace, pods.len())
+}
+
+
+
+// =====================================================================
+// EFFICIENCY (NOT SUPPORTED)
+// =====================================================================
+
+pub async fn get_metric_k8s_namespace_raw_efficiency(
+    _ns: String, _q: RangeQuery
+) -> Result<Value> {
     Ok(json!({
         "status": "not_supported",
         "message": "Namespace efficiency not supported yet"
     }))
 }
 
-pub async fn get_metric_k8s_namespaces_raw_efficiency(_q: RangeQuery) -> Result<Value> {
+pub async fn get_metric_k8s_namespaces_raw_efficiency(
+    _q: RangeQuery,
+    _namespaces: Vec<String>
+) -> Result<Value> {
     Ok(json!({
         "status": "not_supported",
         "message": "Namespace efficiency not supported yet"
     }))
 }
+
+
+// =====================================================================
+// COST
+// =====================================================================
 
 async fn build_namespace_cost(
     namespace: Option<String>,
     q: RangeQuery,
+    filter_namespaces: &[String],
 ) -> Result<MetricGetResponseDto> {
-    let pods = if let Some(ns) = namespace.clone() {
-        namespace_pods(&ns).await?
-    } else {
-        info_k8s_pod_service::list_k8s_pods(K8sListQuery {
-            namespace: None,
-            label_selector: None,
-            node_name: None,
-        })
-        .await?
+
+    let pods = match namespace.as_ref() {
+        Some(ns) => namespace_pods(ns)?,
+        None => all_pods_for(filter_namespaces)?,
     };
 
     if pods.is_empty() {
@@ -351,60 +328,103 @@ async fn build_namespace_cost(
     }
 
     let per_pod = build_pod_response_from_infos(q, pods, namespace.clone())?;
-    Ok(build_namespace_response(namespace.as_deref().unwrap_or("all"), &per_pod))
+
+    Ok(build_namespace_response(
+        namespace.as_deref().unwrap_or("all"),
+        &per_pod,
+    ))
 }
 
-pub async fn get_metric_k8s_namespaces_cost(q: RangeQuery) -> Result<Value> {
-    let aggregated = build_namespace_cost(None, q).await?;
+
+// MULTIPLE NS
+pub async fn get_metric_k8s_namespaces_cost(
+    q: RangeQuery,
+    namespaces: Vec<String>
+) -> Result<Value> {
+    let aggregated = build_namespace_cost(None, q, &namespaces).await?;
     Ok(serde_json::to_value(aggregated)?)
 }
 
-pub async fn get_metric_k8s_namespace_cost(namespace: String, q: RangeQuery) -> Result<Value> {
-    let aggregated = build_namespace_cost(Some(namespace), q).await?;
+pub async fn get_metric_k8s_namespace_cost(
+    ns: String,
+    q: RangeQuery
+) -> Result<Value> {
+    let aggregated = build_namespace_cost(Some(ns), q, &[]).await?;
     Ok(serde_json::to_value(aggregated)?)
 }
 
-pub async fn get_metric_k8s_namespaces_cost_summary(q: RangeQuery) -> Result<Value> {
-    let aggregated = build_namespace_cost(None, q.clone()).await?;
+
+
+// COST SUMMARY
+
+pub async fn get_metric_k8s_namespaces_cost_summary(
+    q: RangeQuery,
+    namespaces: Vec<String>
+) -> Result<Value> {
+
+    let aggregated = build_namespace_cost(None, q.clone(), &namespaces).await?;
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let mut cost_response = aggregated.clone();
-    apply_costs(&mut cost_response, &unit_prices);
-    let dto = build_cost_summary_dto(&cost_response, MetricScope::Namespace, None, &unit_prices);
+
+    let mut cost_resp = aggregated.clone();
+    apply_costs(&mut cost_resp, &unit_prices);
+
+    let dto = build_cost_summary_dto(&cost_resp, MetricScope::Namespace, None, &unit_prices);
     Ok(serde_json::to_value(dto)?)
 }
 
-pub async fn get_metric_k8s_namespace_cost_summary(namespace: String, q: RangeQuery) -> Result<Value> {
-    let aggregated = build_namespace_cost(Some(namespace.clone()), q.clone()).await?;
+pub async fn get_metric_k8s_namespace_cost_summary(
+    ns: String,
+    q: RangeQuery
+) -> Result<Value> {
+
+    let aggregated = build_namespace_cost(Some(ns.clone()), q.clone(), &[]).await?;
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let mut cost_response = aggregated.clone();
-    apply_costs(&mut cost_response, &unit_prices);
+
+    let mut cost_resp = aggregated.clone();
+    apply_costs(&mut cost_resp, &unit_prices);
+
     let dto = build_cost_summary_dto(
-        &cost_response,
+        &cost_resp,
         MetricScope::Namespace,
-        Some(namespace),
+        Some(ns),
         &unit_prices,
     );
+
     Ok(serde_json::to_value(dto)?)
 }
 
-pub async fn get_metric_k8s_namespaces_cost_trend(q: RangeQuery) -> Result<Value> {
-    let aggregated = build_namespace_cost(None, q.clone()).await?;
+
+
+// COST TREND
+
+pub async fn get_metric_k8s_namespaces_cost_trend(
+    q: RangeQuery,
+    namespaces: Vec<String>
+) -> Result<Value> {
+
+    let aggregated = build_namespace_cost(None, q.clone(), &namespaces).await?;
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let mut cost_response = aggregated.clone();
-    apply_costs(&mut cost_response, &unit_prices);
-    let dto = build_cost_trend_dto(&cost_response, MetricScope::Namespace, None)?;
+
+    let mut cost_resp = aggregated.clone();
+    apply_costs(&mut cost_resp, &unit_prices);
+
+    let dto = build_cost_trend_dto(&cost_resp, MetricScope::Namespace, None)?;
     Ok(serde_json::to_value(dto)?)
 }
 
-pub async fn get_metric_k8s_namespace_cost_trend(namespace: String, q: RangeQuery) -> Result<Value> {
-    let aggregated = build_namespace_cost(Some(namespace.clone()), q.clone()).await?;
+pub async fn get_metric_k8s_namespace_cost_trend(
+    ns: String,
+    q: RangeQuery
+) -> Result<Value> {
+
+    let aggregated = build_namespace_cost(Some(ns.clone()), q.clone(), &[]).await?;
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let mut cost_response = aggregated.clone();
-    apply_costs(&mut cost_response, &unit_prices);
-    let dto = build_cost_trend_dto(
-        &cost_response,
-        MetricScope::Namespace,
-        Some(namespace),
-    )?;
+
+    let mut cost_resp = aggregated.clone();
+    apply_costs(&mut cost_resp, &unit_prices);
+
+    let dto =
+        build_cost_trend_dto(&cost_resp, MetricScope::Namespace, Some(ns))?;
+
     Ok(serde_json::to_value(dto)?)
 }
