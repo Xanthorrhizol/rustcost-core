@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use kube::api::{Api, ListParams};
 use serde_json::{json, Value};
-use tracing::{error, info};
+use tracing::{error};
 use crate::core::state::runtime::k8s::k8s_runtime_state_manager::K8sRuntimeStateManager;
 use crate::core::state::runtime::k8s::k8s_runtime_state_repository::K8sRuntimeStateRepository;
 use crate::scheduler::tasks::info::k8s_refresh::task::refresh_k8s_object_info;
