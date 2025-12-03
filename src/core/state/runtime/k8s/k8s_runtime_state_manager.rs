@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use chrono::Utc;
 use crate::core::state::runtime::k8s::k8s_runtime_state::{K8sRuntimeState, RuntimePod};
 use crate::core::state::runtime::k8s::k8s_runtime_state_repository_trait::K8sRuntimeStateRepositoryTrait;
@@ -6,13 +7,16 @@ use crate::errors::AppError;
 
 pub struct K8sRuntimeStateManager<R: K8sRuntimeStateRepositoryTrait> {
     pub(crate) repo: Arc<R>,
+    pub(crate) is_resyncing: AtomicBool,
 }
 
 impl<R: K8sRuntimeStateRepositoryTrait> K8sRuntimeStateManager<R> {
     pub fn new(repo: Arc<R>) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            is_resyncing: AtomicBool::new(false),
+        }
     }
-
     /// Replace the entire K8s runtime state.
     pub async fn set_state(&self, state: K8sRuntimeState) {
         self.repo.set(state).await;
@@ -174,5 +178,9 @@ impl<R: K8sRuntimeStateRepositoryTrait> K8sRuntimeStateManager<R> {
                     .map(move |c| format!("{}-{}", pod.uid, c))
             })
             .collect()
+    }
+
+    pub fn is_resyncing(&self) -> bool {
+        self.is_resyncing.load(Ordering::SeqCst)
     }
 }

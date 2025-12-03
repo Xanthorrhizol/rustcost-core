@@ -1,8 +1,10 @@
 use std::sync::Arc;
-
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 use anyhow::{Context, Result};
 use kube::api::{Api, ListParams};
 use serde_json::{json, Value};
+use tokio::time::sleep;
 use tracing::{error};
 use crate::core::state::runtime::k8s::k8s_runtime_state_manager::K8sRuntimeStateManager;
 use crate::core::state::runtime::k8s::k8s_runtime_state_repository::K8sRuntimeStateRepository;
@@ -33,10 +35,22 @@ pub async fn resync(
 pub async fn do_resync(
     k8s_state: Arc<K8sRuntimeStateManager<K8sRuntimeStateRepository>>,
 ) -> Result<Value> {
+
+    // Prevent double-start
+    if k8s_state.is_resyncing.swap(true, Ordering::SeqCst) {
+        return Ok(json!({ "resync": "already_running" }));
+    }
+
+    let mgr = k8s_state.clone();
+
     tokio::spawn(async move {
-        if let Err(e) = refresh_k8s_object_info(&k8s_state).await {
+        if let Err(e) = refresh_k8s_object_info(&mgr).await {
             error!("K8s resync failed: {e}");
         }
+        // ⏳ WAIT 10 SECONDS BEFORE MARKING COMPLETE
+        sleep(Duration::from_secs(10)).await;
+        // Mark as finished
+        mgr.is_resyncing.store(false, Ordering::SeqCst);
     });
 
     Ok(json!({ "resync": "started" }))

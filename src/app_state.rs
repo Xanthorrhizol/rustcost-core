@@ -5,7 +5,7 @@ use std::sync::Arc;
 //
 
 // system
-use crate::domain::system::service::status_service::status;
+use crate::domain::system::service::status_service::status_internal;
 use crate::domain::system::service::health_service::health;
 use crate::domain::system::service::backup_service::backup;
 use crate::domain::system::service::resync_service::resync;
@@ -150,11 +150,12 @@ impl SystemService {
     }
 
     delegate_async_service! {
-        fn status() -> serde_json::Value => status;
         fn health() -> serde_json::Value => health;
         fn backup() -> serde_json::Value => backup;
     }
-
+    pub async fn status(&self) -> anyhow::Result<serde_json::Value> {
+        status_internal(self.k8s_state.clone()).await
+    }
     pub async fn resync(&self) -> anyhow::Result<serde_json::Value> {
         resync(self.k8s_state.clone()).await
     }
