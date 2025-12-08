@@ -5,10 +5,6 @@
 
 use anyhow::Result;
 
-// Re-export new client as old names for compatibility
-pub use crate::core::client::kube_client::build_kube_client as build_client_async;
-pub use crate::core::client::mappers::*;
-
 // Util module compatibility
 pub mod util {
     use anyhow::Result;
