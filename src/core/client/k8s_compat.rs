@@ -12,11 +12,21 @@ pub mod util {
     use std::env;
 
     pub fn read_token() -> Result<String> {
-        std::env::var("KUBE_TOKEN").or_else(|_| {
-            std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
-                .map(|s| s.trim().to_string())
-                .map_err(Into::into)
-        })
+        if let Ok(token) = std::env::var("KUBE_TOKEN") {
+            return Ok(token);
+        }
+
+        if let Ok(path) = std::env::var("RUSTCOST_TOKEN_PATH") {
+            if let Ok(token) = std::fs::read_to_string(&path) {
+                return Ok(token.trim().to_string());
+            }
+        }
+
+        match std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token") {
+            Ok(token) => Ok(token.trim().to_string()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+            Err(e) => Err(e.into()),
+        }
     }
 
     pub fn build_client() -> Result<Client> {
@@ -27,15 +37,18 @@ pub mod util {
         env::var("RUSTCOST_K8S_API_URL")
             .unwrap_or_else(|_| "https://kubernetes.default.svc".to_string())
     }
+
+    pub async fn build_kube_client() -> Result<kube::Client> {
+        crate::core::client::kube_client::build_kube_client().await
+    }
 }
 
 // Pod client compatibility
 pub mod client_k8s_pod {
-    use kube::{Api, Client};
-    use kube::api::ListParams;
     use super::*;
+    use crate::core::client::{kube_client, pods};
     use crate::core::client::kube_resources::Pod;
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct PodList {
@@ -43,47 +56,53 @@ pub mod client_k8s_pod {
     }
 
     /// Fetch ALL pods using kube-rs
-    pub async fn fetch_pods(_token: &str, client: &Client) -> Result<PodList> {
-        let api: Api<Pod> = Api::all(client.clone());
-        let list = api.list(&ListParams::default()).await?;
-        Ok(PodList { items: list.items })
+    pub async fn fetch_pods(_token: &str, _client: &reqwest::Client) -> Result<PodList> {
+        let kube = kube_client::build_kube_client().await?;
+        let items = pods::fetch_pods(&kube).await?;
+        Ok(PodList { items })
     }
 
     pub async fn fetch_pod_by_uid(_token: &str, _client: &reqwest::Client, uid: &str) -> Result<Pod> {
-        let kube = crate::core::client::kube_client::build_kube_client().await?;
-        crate::core::client::pods::fetch_pod_by_uid(&kube, uid).await
+        let kube = kube_client::build_kube_client().await?;
+        pods::fetch_pod_by_uid(&kube, uid).await
     }
     pub async fn fetch_pod_by_name_and_namespace(
-        client: &Client,
+        _client: &reqwest::Client,
         namespace: &str,
         name: &str,
     ) -> Result<Pod> {
-        let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
-        Ok(api.get(name).await?)
+        let kube = kube_client::build_kube_client().await?;
+        pods::fetch_pod_by_name_and_namespace(&kube, namespace, name).await
     }
 
     pub async fn fetch_pods_by_label(
         _token: &str,
         _client: &reqwest::Client,
-        _label: &str,
+        label: &str,
     ) -> Result<PodList> {
-        Ok(PodList { items: Vec::new() })
+        let kube = kube_client::build_kube_client().await?;
+        let items = pods::fetch_pods_by_label(&kube, label).await?;
+        Ok(PodList { items })
     }
 
     pub async fn fetch_pods_by_namespace(
         _token: &str,
         _client: &reqwest::Client,
-        _namespace: &str,
+        namespace: &str,
     ) -> Result<PodList> {
-        Ok(PodList { items: Vec::new() })
+        let kube = kube_client::build_kube_client().await?;
+        let items = pods::fetch_pods_by_namespace(&kube, namespace).await?;
+        Ok(PodList { items })
     }
 
     pub async fn fetch_pods_by_node(
         _token: &str,
         _client: &reqwest::Client,
-        _node: &str,
+        node: &str,
     ) -> Result<PodList> {
-        Ok(PodList { items: Vec::new() })
+        let kube = kube_client::build_kube_client().await?;
+        let items = pods::fetch_pods_by_node(&kube, node).await?;
+        Ok(PodList { items })
     }
 }
 
@@ -101,16 +120,52 @@ pub mod client_k8s_pod_mapper {
 // Deployment compatibility
 pub mod client_k8s_deployment {
     use super::*;
+    use crate::core::client::{deployments, kube_client};
     use crate::core::client::kube_resources::Deployment;
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct DeploymentList {
         pub items: Vec<Deployment>,
     }
 
-    pub async fn fetch_deployments(_token: &str, _client: &reqwest::Client) -> Result<DeploymentList> {
-        Ok(DeploymentList { items: Vec::new() })
+    pub async fn fetch_deployments(
+        _token: &str,
+        _client: &reqwest::Client,
+    ) -> Result<DeploymentList> {
+        let kube = kube_client::build_kube_client().await?;
+        let items = deployments::fetch_deployments(&kube).await?;
+        Ok(DeploymentList { items })
+    }
+
+    pub async fn fetch_deployment_by_name_and_namespace(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<Deployment> {
+        let kube = kube_client::build_kube_client().await?;
+        deployments::fetch_deployment_by_name_and_namespace(&kube, namespace, name).await
+    }
+
+    pub async fn fetch_deployments_by_namespace(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+    ) -> Result<DeploymentList> {
+        let kube = kube_client::build_kube_client().await?;
+        let items = deployments::fetch_deployments_by_namespace(&kube, namespace).await?;
+        Ok(DeploymentList { items })
+    }
+
+    pub async fn fetch_deployments_by_label(
+        _token: &str,
+        _client: &reqwest::Client,
+        label: &str,
+    ) -> Result<DeploymentList> {
+        let kube = kube_client::build_kube_client().await?;
+        let items = deployments::fetch_deployments_by_label(&kube, label).await?;
+        Ok(DeploymentList { items })
     }
 }
 
@@ -128,6 +183,7 @@ pub mod client_k8s_deployment_mapper {
 pub mod client_k8s_namespace {
     use super::*;
     use crate::core::client::kube_resources::Namespace;
+    use crate::core::client::{kube_client, namespaces};
     use serde::{Serialize, Deserialize};
 
     #[derive(Serialize, Deserialize, Clone)]
@@ -136,7 +192,18 @@ pub mod client_k8s_namespace {
     }
 
     pub async fn fetch_namespaces(_token: &str, _client: &reqwest::Client) -> Result<NamespaceList> {
-        Ok(NamespaceList { items: Vec::new() })
+        let kube = kube_client::build_kube_client().await?;
+        let items = namespaces::fetch_namespaces(&kube).await?;
+        Ok(NamespaceList { items })
+    }
+
+    pub async fn fetch_namespace_by_name(
+        _token: &str,
+        _client: &reqwest::Client,
+        name: &str,
+    ) -> Result<Namespace> {
+        let kube = kube_client::build_kube_client().await?;
+        namespaces::fetch_namespace_by_name(&kube, name).await
     }
 }
 
@@ -172,14 +239,16 @@ pub mod client_k8s_container_mapper {
 // HPA compatibility
 pub mod client_k8s_hpa {
     use super::*;
+    use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::HorizontalPodAutoscaler;
 
     pub async fn fetch_hpas(_token: &str, _client: &reqwest::Client) -> Result<Vec<HorizontalPodAutoscaler>> {
-        Ok(Vec::new())
+        let kube = kube_client::build_kube_client().await?;
+        other_resources::fetch_hpas(&kube).await
     }
 
     pub async fn fetch_horizontal_pod_autoscalers(_token: &str, _client: &reqwest::Client) -> Result<Vec<HorizontalPodAutoscaler>> {
-        Ok(Vec::new())
+        fetch_hpas(_token, _client).await
     }
 }
 
@@ -188,10 +257,12 @@ pub mod client_k8s_hpa_mapper {}
 // LimitRange compatibility
 pub mod client_k8s_limit_range {
     use super::*;
+    use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::LimitRange;
 
     pub async fn fetch_limit_ranges(_token: &str, _client: &reqwest::Client) -> Result<Vec<LimitRange>> {
-        Ok(Vec::new())
+        let kube = kube_client::build_kube_client().await?;
+        other_resources::fetch_limit_ranges(&kube).await
     }
 }
 
@@ -200,19 +271,23 @@ pub mod client_k8s_limit_range_mapper {}
 // PV/PVC compatibility
 pub mod client_k8s_persistent_volume {
     use super::*;
+    use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::PersistentVolume;
 
     pub async fn fetch_persistent_volumes(_token: &str, _client: &reqwest::Client) -> Result<Vec<PersistentVolume>> {
-        Ok(Vec::new())
+        let kube = kube_client::build_kube_client().await?;
+        other_resources::fetch_persistent_volumes(&kube).await
     }
 }
 
 pub mod client_k8s_persistent_volume_claim {
     use super::*;
+    use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::PersistentVolumeClaim;
 
     pub async fn fetch_persistent_volume_claims(_token: &str, _client: &reqwest::Client) -> Result<Vec<PersistentVolumeClaim>> {
-        Ok(Vec::new())
+        let kube = kube_client::build_kube_client().await?;
+        other_resources::fetch_persistent_volume_claims(&kube).await
     }
 }
 
@@ -222,10 +297,12 @@ pub mod client_k8s_persistent_volume_claim_mapper {}
 // ResourceQuota compatibility
 pub mod client_k8s_resource_quota {
     use super::*;
+    use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::ResourceQuota;
 
     pub async fn fetch_resource_quotas(_token: &str, _client: &reqwest::Client) -> Result<Vec<ResourceQuota>> {
-        Ok(Vec::new())
+        let kube = kube_client::build_kube_client().await?;
+        other_resources::fetch_resource_quotas(&kube).await
     }
 }
 
