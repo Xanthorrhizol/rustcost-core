@@ -48,7 +48,9 @@ pub mod client_k8s_pod {
     use super::*;
     use crate::core::client::{kube_client, pods};
     use crate::core::client::kube_resources::Pod;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
     use serde::{Deserialize, Serialize};
+    use serde_json::Value;
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct PodList {
@@ -104,6 +106,43 @@ pub mod client_k8s_pod {
         let items = pods::fetch_pods_by_node(&kube, node).await?;
         Ok(PodList { items })
     }
+
+    pub async fn create_pod(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        pod: &Pod,
+    ) -> Result<Pod> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Pod> = kube::Api::namespaced(kube, namespace);
+        Ok(api.create(&PostParams::default(), pod).await?)
+    }
+
+    pub async fn patch_pod(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+        patch: Value,
+    ) -> Result<Pod> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Pod> = kube::Api::namespaced(kube, namespace);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_pod(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Pod> = kube::Api::namespaced(kube, namespace);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
+    }
 }
 
 // Pod mapper compatibility
@@ -122,7 +161,9 @@ pub mod client_k8s_deployment {
     use super::*;
     use crate::core::client::{deployments, kube_client};
     use crate::core::client::kube_resources::Deployment;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
     use serde::{Deserialize, Serialize};
+    use serde_json::Value;
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct DeploymentList {
@@ -167,6 +208,43 @@ pub mod client_k8s_deployment {
         let items = deployments::fetch_deployments_by_label(&kube, label).await?;
         Ok(DeploymentList { items })
     }
+
+    pub async fn create_deployment(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        deployment: &Deployment,
+    ) -> Result<Deployment> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Deployment> = kube::Api::namespaced(kube, namespace);
+        Ok(api.create(&PostParams::default(), deployment).await?)
+    }
+
+    pub async fn patch_deployment(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+        patch: Value,
+    ) -> Result<Deployment> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Deployment> = kube::Api::namespaced(kube, namespace);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_deployment(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Deployment> = kube::Api::namespaced(kube, namespace);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
+    }
 }
 
 pub mod client_k8s_deployment_mapper {
@@ -184,7 +262,9 @@ pub mod client_k8s_namespace {
     use super::*;
     use crate::core::client::kube_resources::Namespace;
     use crate::core::client::{kube_client, namespaces};
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
     use serde::{Serialize, Deserialize};
+    use serde_json::Value;
 
     #[derive(Serialize, Deserialize, Clone)]
     pub struct NamespaceList {
@@ -204,6 +284,40 @@ pub mod client_k8s_namespace {
     ) -> Result<Namespace> {
         let kube = kube_client::build_kube_client().await?;
         namespaces::fetch_namespace_by_name(&kube, name).await
+    }
+
+    pub async fn create_namespace(
+        _token: &str,
+        _client: &reqwest::Client,
+        ns: &Namespace,
+    ) -> Result<Namespace> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Namespace> = kube::Api::all(kube);
+        Ok(api.create(&PostParams::default(), ns).await?)
+    }
+
+    pub async fn patch_namespace(
+        _token: &str,
+        _client: &reqwest::Client,
+        name: &str,
+        patch: Value,
+    ) -> Result<Namespace> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Namespace> = kube::Api::all(kube);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_namespace(
+        _token: &str,
+        _client: &reqwest::Client,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<Namespace> = kube::Api::all(kube);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
     }
 }
 
@@ -241,6 +355,8 @@ pub mod client_k8s_hpa {
     use super::*;
     use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::HorizontalPodAutoscaler;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
+    use serde_json::Value;
 
     pub async fn fetch_hpas(_token: &str, _client: &reqwest::Client) -> Result<Vec<HorizontalPodAutoscaler>> {
         let kube = kube_client::build_kube_client().await?;
@@ -249,6 +365,43 @@ pub mod client_k8s_hpa {
 
     pub async fn fetch_horizontal_pod_autoscalers(_token: &str, _client: &reqwest::Client) -> Result<Vec<HorizontalPodAutoscaler>> {
         fetch_hpas(_token, _client).await
+    }
+
+    pub async fn create_hpa(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        hpa: &HorizontalPodAutoscaler,
+    ) -> Result<HorizontalPodAutoscaler> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<HorizontalPodAutoscaler> = kube::Api::namespaced(kube, namespace);
+        Ok(api.create(&PostParams::default(), hpa).await?)
+    }
+
+    pub async fn patch_hpa(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+        patch: Value,
+    ) -> Result<HorizontalPodAutoscaler> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<HorizontalPodAutoscaler> = kube::Api::namespaced(kube, namespace);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_hpa(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<HorizontalPodAutoscaler> = kube::Api::namespaced(kube, namespace);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
     }
 }
 
@@ -259,10 +412,49 @@ pub mod client_k8s_limit_range {
     use super::*;
     use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::LimitRange;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
+    use serde_json::Value;
 
     pub async fn fetch_limit_ranges(_token: &str, _client: &reqwest::Client) -> Result<Vec<LimitRange>> {
         let kube = kube_client::build_kube_client().await?;
         other_resources::fetch_limit_ranges(&kube).await
+    }
+
+    pub async fn create_limit_range(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        lr: &LimitRange,
+    ) -> Result<LimitRange> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<LimitRange> = kube::Api::namespaced(kube, namespace);
+        Ok(api.create(&PostParams::default(), lr).await?)
+    }
+
+    pub async fn patch_limit_range(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+        patch: Value,
+    ) -> Result<LimitRange> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<LimitRange> = kube::Api::namespaced(kube, namespace);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_limit_range(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<LimitRange> = kube::Api::namespaced(kube, namespace);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
     }
 }
 
@@ -273,10 +465,46 @@ pub mod client_k8s_persistent_volume {
     use super::*;
     use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::PersistentVolume;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
+    use serde_json::Value;
 
     pub async fn fetch_persistent_volumes(_token: &str, _client: &reqwest::Client) -> Result<Vec<PersistentVolume>> {
         let kube = kube_client::build_kube_client().await?;
         other_resources::fetch_persistent_volumes(&kube).await
+    }
+
+    pub async fn create_persistent_volume(
+        _token: &str,
+        _client: &reqwest::Client,
+        pv: &PersistentVolume,
+    ) -> Result<PersistentVolume> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<PersistentVolume> = kube::Api::all(kube);
+        Ok(api.create(&PostParams::default(), pv).await?)
+    }
+
+    pub async fn patch_persistent_volume(
+        _token: &str,
+        _client: &reqwest::Client,
+        name: &str,
+        patch: Value,
+    ) -> Result<PersistentVolume> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<PersistentVolume> = kube::Api::all(kube);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_persistent_volume(
+        _token: &str,
+        _client: &reqwest::Client,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<PersistentVolume> = kube::Api::all(kube);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
     }
 }
 
@@ -284,10 +512,49 @@ pub mod client_k8s_persistent_volume_claim {
     use super::*;
     use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::PersistentVolumeClaim;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
+    use serde_json::Value;
 
     pub async fn fetch_persistent_volume_claims(_token: &str, _client: &reqwest::Client) -> Result<Vec<PersistentVolumeClaim>> {
         let kube = kube_client::build_kube_client().await?;
         other_resources::fetch_persistent_volume_claims(&kube).await
+    }
+
+    pub async fn create_persistent_volume_claim(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        pvc: &PersistentVolumeClaim,
+    ) -> Result<PersistentVolumeClaim> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<PersistentVolumeClaim> = kube::Api::namespaced(kube, namespace);
+        Ok(api.create(&PostParams::default(), pvc).await?)
+    }
+
+    pub async fn patch_persistent_volume_claim(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+        patch: Value,
+    ) -> Result<PersistentVolumeClaim> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<PersistentVolumeClaim> = kube::Api::namespaced(kube, namespace);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_persistent_volume_claim(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<PersistentVolumeClaim> = kube::Api::namespaced(kube, namespace);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
     }
 }
 
@@ -299,10 +566,49 @@ pub mod client_k8s_resource_quota {
     use super::*;
     use crate::core::client::{kube_client, other_resources};
     use crate::core::client::kube_resources::ResourceQuota;
+    use kube::api::{DeleteParams, Patch, PatchParams, PostParams};
+    use serde_json::Value;
 
     pub async fn fetch_resource_quotas(_token: &str, _client: &reqwest::Client) -> Result<Vec<ResourceQuota>> {
         let kube = kube_client::build_kube_client().await?;
         other_resources::fetch_resource_quotas(&kube).await
+    }
+
+    pub async fn create_resource_quota(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        rq: &ResourceQuota,
+    ) -> Result<ResourceQuota> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<ResourceQuota> = kube::Api::namespaced(kube, namespace);
+        Ok(api.create(&PostParams::default(), rq).await?)
+    }
+
+    pub async fn patch_resource_quota(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+        patch: Value,
+    ) -> Result<ResourceQuota> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<ResourceQuota> = kube::Api::namespaced(kube, namespace);
+        Ok(api
+            .patch(name, &PatchParams::default(), &Patch::Merge(patch))
+            .await?)
+    }
+
+    pub async fn delete_resource_quota(
+        _token: &str,
+        _client: &reqwest::Client,
+        namespace: &str,
+        name: &str,
+    ) -> Result<()> {
+        let kube = kube_client::build_kube_client().await?;
+        let api: kube::Api<ResourceQuota> = kube::Api::namespaced(kube, namespace);
+        let _ = api.delete(name, &DeleteParams::default()).await?;
+        Ok(())
     }
 }
 
