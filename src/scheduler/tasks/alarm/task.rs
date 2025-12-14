@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
+use tracing::debug;
 
 use crate::app_state::AppState;
 use crate::core::persistence::info::fixed::alerts::alert_rule_entity::{
@@ -21,16 +22,23 @@ pub async fn handle_alarm(
     let alert_cfg = state.info_service.get_info_alerts().await?;
 
     let snapshot = build_snapshot(summary);
+    debug!(?snapshot, "alert_snapshot_built");
 
     let (triggered, active_conditions): (Vec<AlertRuleEntity>, HashSet<String>) = {
         let evaluator = EVALUATOR.get_or_init(|| Mutex::new(AlertRuleEvaluator::default()));
         let mut guard = evaluator.lock().unwrap();
         let outcome = guard.evaluate(&alert_cfg.rules, &snapshot, now);
+        debug!(
+            triggered_ids = ?outcome.triggered.iter().map(|r| &r.id).collect::<Vec<_>>(),
+            active_ids = ?outcome.active_conditions,
+            "alert_rules_evaluated"
+        );
         (outcome.triggered, outcome.active_conditions)
     };
 
     for rule in triggered.iter() {
         let message = format_rule_message(rule, &snapshot);
+        debug!(rule_id = %rule.id, severity = ?rule.severity, "alert_rule_triggered");
         state
             .alerts
             .fire_alert(rule.id.clone(), message.clone(), severity_str(&rule.severity))
@@ -38,6 +46,7 @@ pub async fn handle_alarm(
 
         if let Some(url) = alert_cfg.discord_webhook_url.as_deref() {
             let sender = DiscordWebhookSender::default();
+            debug!(rule_id = %rule.id, "sending_discord_webhook");
             if let Err(err) = sender.send(url, rule, &message).await {
                 tracing::warn!(error = ?err, "Failed to send Discord webhook alert");
             }
@@ -67,6 +76,12 @@ fn build_snapshot(summary: &Summary) -> AlertMetricSnapshot {
         _ => None,
     };
 
+    let cpu_pct = summary
+        .node
+        .cpu
+        .usage_nano_cores
+        .map(|nano| (nano as f64 / 1_000_000_000.0) * 100.0);
+
     let disk_pct = summary
         .node
         .fs
@@ -77,7 +92,7 @@ fn build_snapshot(summary: &Summary) -> AlertMetricSnapshot {
         });
 
     AlertMetricSnapshot {
-        cpu_usage_percent: None,  // TODO: add node capacity to compute CPU %
+        cpu_usage_percent: cpu_pct,
         memory_usage_percent: mem_pct,
         disk_usage_percent: disk_pct,
         gpu_usage_percent: None,

@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use reqwest::{Client, StatusCode};
 use serde::Serialize;
+use tracing::{debug, warn};
 
 use crate::core::persistence::info::fixed::alerts::alert_rule_entity::{AlertRuleEntity, AlertSeverity};
 
@@ -43,14 +44,23 @@ impl DiscordWebhookSender {
     ) -> Result<()> {
         let mut last_status: Option<StatusCode> = None;
 
-        for _ in 0..attempts {
+        for attempt in 1..=attempts {
             let resp = self.client.post(webhook_url).json(payload).send().await?;
             let status = resp.status();
+            debug!(attempt, status = ?status, "discord_webhook_response");
             if status.is_success() {
                 // Discord returns 204 on success; any 2xx is accepted.
                 return Ok(());
             }
 
+            // Capture a small error body to aid debugging without logging the URL.
+            let body = resp.text().await.unwrap_or_default();
+            warn!(
+                attempt,
+                status = ?status,
+                body = %body,
+                "discord_webhook_non_success"
+            );
             last_status = Some(status);
         }
 
