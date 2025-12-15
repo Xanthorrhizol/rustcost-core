@@ -57,6 +57,13 @@ pub struct RangeQuery {
     /// Filter by Kubernetes namespace.
     pub namespace: Option<String>,
 
+    /// Filter by resource labels.
+    /// Expected format (convention-based):
+    /// - `key=value`
+    /// - `key1=value1,key2=value2`
+    /// Example: `"app=api,tier=backend"`
+    pub labels: Option<String>,
+
     // --- Resource Identification ---
 
     /// A unique identifier for a specific resource object.
