@@ -42,6 +42,14 @@ pub struct RangeQuery {
     /// Format convention: `field_name` (asc) or `-field_name` (desc).
     pub sort: Option<String>,
 
+
+    /// Cost calculation mode.
+    ///
+    /// - `showback` (default): Informational cost attribution
+    /// - `chargeback`: Enforced cost allocation
+    #[serde(default)]
+    pub mode: CostMode,
+
     // --- Scope Filters ---
 
     /// Filter metrics by the owning team.
@@ -74,4 +82,35 @@ pub struct RangeQuery {
     /// * Container Name + Pod UID
     /// * Node Name
     pub key: Option<String>
+}
+
+/// Cost calculation mode.
+///
+/// Currently, Rustcost calculates costs using the **Showback** model (usage-based).
+/// However, the system can also support a **Chargeback** model in the future,
+/// so the cost calculation mode should be configurable.
+///
+/// ### Showback (default candidate)
+/// - Based on actual resource usage (CPU, memory, storage, network)
+/// - Intuitive for efficiency analysis and resource optimization
+/// - Does not match total cluster cost in node time–based billing environments
+///
+/// ### Chargeback (OpenCost-style)
+/// - Based on allocated resources: `max(usage, request)`
+/// - Enables clear cost ownership and idle cost attribution
+/// - Makes over-provisioning visible from a cost perspective
+///
+/// Choosing the default mode affects how users interpret cost data
+/// and requires careful discussion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CostMode {
+    Showback,
+    Chargeback,
+}
+
+impl Default for CostMode {
+    fn default() -> Self {
+        CostMode::Showback
+    }
 }
