@@ -22,21 +22,25 @@ pub fn split_day_granularity_rows<T>(
     // =========================
     // 1️⃣ start day → hour rows
     // =========================
-    let start_day_end = start_date
-        .and_hms_opt(23, 59, 59)
-        .unwrap()
-        .and_utc();
+    let start_hour_rows = if !is_start_full_day {
+        let start_day_end = start_date
+            .and_hms_opt(23, 59, 59)
+            .unwrap()
+            .and_utc();
 
-    let start_hour_rows = hour_repo.get_row_between(
-        object_name,
-        window.start,
-        start_day_end.min(window.end),
-    )?;
+        hour_repo.get_row_between(
+            object_name,
+            window.start,
+            start_day_end.min(window.end),
+        )?
+    } else {
+        vec![]
+    };
 
     // =========================
     // 2️⃣ end day → hour rows
     // =========================
-    let end_hour_rows = if start_date != end_date {
+    let end_hour_rows = if start_date != end_date && !is_end_full_day {
         let end_day_start = end_date
             .and_hms_opt(0, 0, 0)
             .unwrap()
