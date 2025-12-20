@@ -17,8 +17,6 @@
 
 ---
 
-![Docker Pulls](https://img.shields.io/docker/pulls/rustcost/core.svg) ![Docker Image Size](https://img.shields.io/docker/image-size/rustcost/core/1.0.0-dev.16) ![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
-
 RustCost Core is a lightweight, Kubernetes-native backend that ingests cluster resource and billing data, normalizes and aggregates CPU/GPU/memory utilization and cost metrics, and exposes RESTful APIs plus Prometheus-compatible metrics for dashboards and exporters. It supports pluggable persistence (file or SQL adapters), scheduler-driven collectors, Helm deployment, and is optimized for high-throughput telemetry and cost-allocation workflows.
 
 ---
@@ -157,3 +155,4 @@ We welcome:
 ## License
 
 Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+</div>
