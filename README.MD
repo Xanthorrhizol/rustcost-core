@@ -6,6 +6,15 @@
   <strong id="rc-title" style="font-size:40px;">RUSTCOST-CORE</strong>
 </p>
 
+<div align="center">
+
+<!-- Badges -->
+<img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/rustcost/core.svg">
+<img alt="Docker Image Size" src="https://img.shields.io/docker/image-size/rustcost/core/1.0.0-dev.19">
+<img alt="License: Apache-2.0" src="https://img.shields.io/badge/License-Apache--2.0-blue.svg">
+
+</div>
+
 ---
 
 ![Docker Pulls](https://img.shields.io/docker/pulls/rustcost/core.svg) ![Docker Image Size](https://img.shields.io/docker/image-size/rustcost/core/1.0.0-dev.16) ![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
