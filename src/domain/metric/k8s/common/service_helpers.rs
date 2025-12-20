@@ -21,6 +21,7 @@ use crate::domain::metric::k8s::common::dto::metric_k8s_raw_summary_dto::{
 use crate::domain::metric::k8s::common::util::k8s_metric_determine_granularity::determine_granularity;
 use std::collections::HashMap;
 use tracing::log::warn;
+use crate::core::persistence::info::k8s::node::info_node_entity::InfoNodeEntity;
 use crate::core::util::cost_util::CostUtil;
 
 pub const BYTES_PER_GB: f64 = 1_073_741_824.0;
@@ -219,15 +220,31 @@ pub fn apply_costs(response: &mut MetricGetResponseDto, unit_prices: &InfoUnitPr
             let interval_hours =
                 point_interval_hours_from_timestamps(&timestamps, idx, default_interval_hours);
 
-            // ---- CPU ----
-            let cpu_cost_usd = point.cpu_memory.cpu_usage_nano_cores
-                .map(|nano| CostUtil::compute_cpu_cost(nano, interval_hours, unit_prices));
+            // ---------------------------
+            // CPU (usage-based)
+            // ---------------------------
+            // IMPORTANT:
+            // - cpu_usage_nano_cores is a gauge (instantaneous), suitable for graphs, not cost.
+            // - cpu_usage_core_nano_seconds should already represent "usage within the interval"
+            //   after minute->hour (increase) and hour->day (sum).
+            let cpu_cost_usd = point.cpu_memory.cpu_usage_core_nano_seconds
+                .map(|core_nano_seconds| {
+                    CostUtil::compute_cpu_cost_from_core_nano_seconds(core_nano_seconds, unit_prices)
+                });
 
-            // ---- MEMORY ----
-            let memory_cost_usd = point.cpu_memory.memory_usage_bytes
+            // ---------------------------
+            // MEMORY (gauge * time)
+            // ---------------------------
+            // Prefer working_set for cost, fallback to memory_usage if missing.
+            let memory_bytes_for_cost = point.cpu_memory.memory_working_set_bytes
+                .or(point.cpu_memory.memory_usage_bytes);
+
+            let memory_cost_usd = memory_bytes_for_cost
                 .map(|bytes| CostUtil::compute_memory_cost(bytes, interval_hours, unit_prices));
 
-            // ---- STORAGE (ephemeral + persistent) ----
+            // ---------------------------
+            // STORAGE (gauge * time)
+            // ---------------------------
             let ephemeral_gb_hours = point.filesystem
                 .as_ref()
                 .and_then(|fs| fs.used_bytes)
@@ -244,14 +261,19 @@ pub fn apply_costs(response: &mut MetricGetResponseDto, unit_prices: &InfoUnitPr
             let total_storage_gb_hours = ephemeral_gb_hours + persistent_gb_hours;
             let storage_cost_usd = Some(total_storage_gb_hours * unit_prices.storage_gb_hour);
 
-            // ---- NETWORK ----
-            let network_cost_usd = point.network.as_ref().map(|n| {
+            // ---------------------------
+            // NETWORK (usage-based)
+            // ---------------------------
+            // If rx/tx are interval usage (bytes), do NOT multiply by interval_hours.
+            let network_cost_usd: f64 = point.network.as_ref().map(|n| {
                 let rx_gb = CostUtil::bytes_to_gb(n.rx_bytes.unwrap_or(0.0));
                 let tx_gb = CostUtil::bytes_to_gb(n.tx_bytes.unwrap_or(0.0));
                 (rx_gb + tx_gb) * unit_prices.network_external_gb
             }).unwrap_or(0.0);
 
-            // ---- TOTAL COST ----
+            // ---------------------------
+            // TOTAL
+            // ---------------------------
             let total_cost_usd = Some(
                 cpu_cost_usd.unwrap_or(0.0)
                     + memory_cost_usd.unwrap_or(0.0)
@@ -259,7 +281,6 @@ pub fn apply_costs(response: &mut MetricGetResponseDto, unit_prices: &InfoUnitPr
                     + network_cost_usd
             );
 
-            // Store into point
             point.cost = Some(CostMetricDto {
                 total_cost_usd,
                 cpu_cost_usd,
@@ -267,6 +288,57 @@ pub fn apply_costs(response: &mut MetricGetResponseDto, unit_prices: &InfoUnitPr
                 storage_cost_usd,
             });
         }
+    }
+}
+
+pub fn apply_node_costs(
+    response: &mut MetricGetResponseDto,
+    unit_prices: &InfoUnitPriceEntity,
+    node_infos: &Vec<InfoNodeEntity>,
+) {
+    for series in &mut response.series {
+        // 🔹 series.key == node_name
+        let node_name = &series.key;
+
+        // Find Node Info
+        let node_info = match node_infos.iter().find(|n| n.node_name.as_deref() == Some(node_name)) {
+            Some(n) => n,
+            None => continue,
+        };
+
+        // Check Running Hours
+        let running_hours = match series.running_hours {
+            Some(h) if h > 0.0 => h,
+            _ => continue,
+        };
+
+        // Get Resource Capacity
+        let cpu_cores = node_info.cpu_capacity_cores.unwrap_or(0) as f64;
+        let memory_gb =
+            node_info.memory_capacity_bytes.unwrap_or(0) as f64 / 1_073_741_824.0;
+        let storage_gb =
+            node_info.ephemeral_storage_capacity_bytes.unwrap_or(0) as f64 / 1_073_741_824.0;
+
+
+        let cpu_cost_usd = Some(cpu_cores * running_hours * unit_prices.cpu_core_hour);
+        let memory_cost_usd = Some(memory_gb * running_hours * unit_prices.memory_gb_hour);
+        let storage_cost_usd = Some(storage_gb * running_hours * unit_prices.storage_gb_hour);
+
+        let network_cost_usd = 0.0;
+
+        let total_cost_usd = Some(
+            cpu_cost_usd.unwrap_or(0.0)
+                + memory_cost_usd.unwrap_or(0.0)
+                + storage_cost_usd.unwrap_or(0.0)
+                + network_cost_usd
+        );
+
+        series.cost_summary = Some(CostMetricDto {
+            total_cost_usd,
+            cpu_cost_usd,
+            memory_cost_usd,
+            storage_cost_usd,
+        });
     }
 }
 
@@ -322,6 +394,50 @@ pub fn build_cost_summary_dto(
                 summary.total_cost_usd += cpu_cost + memory_cost + ephemeral_cost + persistent_cost + network_cost;
             }
         }
+    }
+
+    MetricCostSummaryResponseDto {
+        start: metrics.start,
+        end: metrics.end,
+        scope,
+        target,
+        granularity: metrics.granularity.clone(),
+        summary,
+    }
+}
+
+pub fn build_node_cost_summary_dto(
+    metrics: &MetricGetResponseDto,
+    scope: MetricScope,
+    target: Option<String>,
+    unit_prices: &InfoUnitPriceEntity,
+) -> MetricCostSummaryResponseDto {
+    let mut summary = MetricCostSummaryDto::default();
+
+    for series in &metrics.series {
+        for (idx, point) in series.points.iter().enumerate() {
+            let mut network_cost = 0.0;
+            if let Some(cost) = &point.cost {
+                network_cost = point
+                    .network
+                    .as_ref()
+                    .map(|n| {
+                        let rx_gb = n.rx_bytes.unwrap_or(0.0) / BYTES_PER_GB;
+                        let tx_gb = n.tx_bytes.unwrap_or(0.0) / BYTES_PER_GB;
+                        (rx_gb + tx_gb) * unit_prices.network_external_gb
+                    })
+                    .unwrap_or(0.0);
+
+
+            }
+            summary.network_cost_usd += network_cost;
+
+
+        }
+        summary.cpu_cost_usd += series.cost_summary.as_ref().map(|c| c.cpu_cost_usd.unwrap_or(0.0)).unwrap_or(0.0);
+        summary.memory_cost_usd += series.cost_summary.as_ref().map(|c| c.memory_cost_usd.unwrap_or(0.0)).unwrap_or(0.0);
+        summary.ephemeral_storage_cost_usd += series.cost_summary.as_ref().map(|c| c.storage_cost_usd.unwrap_or(0.0)).unwrap_or(0.0);
+        summary.total_cost_usd += series.cost_summary.as_ref().map(|c| c.total_cost_usd.unwrap_or(0.0)).unwrap_or(0.0) + summary.network_cost_usd;
     }
 
     MetricCostSummaryResponseDto {
