@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
+#[allow(dead_code)]
 pub struct RangeParams {
     pub start: Option<NaiveDateTime>,
     pub end: Option<NaiveDateTime>,

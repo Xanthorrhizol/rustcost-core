@@ -3,7 +3,9 @@ use reqwest::{Client, StatusCode};
 use serde::Serialize;
 use tracing::{debug, warn};
 
-use crate::core::persistence::info::fixed::alerts::alert_rule_entity::{AlertRuleEntity, AlertSeverity};
+use crate::core::persistence::info::fixed::alerts::alert_rule_entity::{
+    AlertRuleEntity, AlertSeverity,
+};
 
 pub struct DiscordWebhookSender {
     client: Client,
@@ -18,12 +20,13 @@ impl Default for DiscordWebhookSender {
 }
 
 impl DiscordWebhookSender {
-    pub fn new(client: Client) -> Self {
-        Self { client }
-    }
-
     /// Sends an alert to Discord using embeds and retries on non-2xx responses.
-    pub async fn send(&self, webhook_url: &str, rule: &AlertRuleEntity, message: &str) -> Result<()> {
+    pub async fn send(
+        &self,
+        webhook_url: &str,
+        rule: &AlertRuleEntity,
+        message: &str,
+    ) -> Result<()> {
         let payload = DiscordWebhookPayload {
             content: None,
             embeds: vec![DiscordEmbed {

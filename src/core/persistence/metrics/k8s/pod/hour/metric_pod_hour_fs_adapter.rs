@@ -1,20 +1,19 @@
-use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
+use crate::core::persistence::metrics::k8s::path::{
+    metric_k8s_pod_key_hour_dir_path, metric_k8s_pod_key_hour_file_path,
+};
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
-use anyhow::{anyhow,  Result};
-use chrono::{DateTime, NaiveDate, Datelike, Utc};
+use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_fs_adapter::MetricPodMinuteFsAdapter;
+use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use std::io::BufWriter;
+use std::path::PathBuf;
 use std::{
     fs::File,
     fs::{self, OpenOptions},
     io::Write,
     io::{BufRead, BufReader},
     path::Path,
-};
-use std::path::PathBuf;
-use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_fs_adapter::MetricPodMinuteFsAdapter;
-use crate::core::persistence::metrics::k8s::path::{
-    metric_k8s_pod_key_hour_dir_path,
-    metric_k8s_pod_key_hour_file_path,
 };
 
 /// Adapter for pod minute-level metrics.
@@ -23,7 +22,6 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricPodHourFsAdapter;
 
 impl MetricPodHourFsAdapter {
-
     /// Delete a batch of files safely
     fn delete_batch(batch: &[PathBuf]) -> Result<()> {
         for path in batch {
@@ -80,7 +78,6 @@ impl MetricPodHourFsAdapter {
     //     Ok(())
     // }
 
-
     fn opt(v: Option<u64>) -> String {
         v.map(|x| x.to_string()).unwrap_or_default()
     }
@@ -101,10 +98,7 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         // let new = !path.exists();
 
         // ✅ open file and wrap in BufWriter
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
         let mut writer = BufWriter::new(file);
 
         // Write header if file newly created
@@ -136,7 +130,6 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
             Self::opt(dto.pv_inodes),
         );
 
-
         // ✅ write to buffer
         writer.write_all(row.as_bytes())?;
 
@@ -151,7 +144,7 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         pod_uid: &str,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-        now: DateTime<Utc>
+        now: DateTime<Utc>,
     ) -> Result<()> {
         // 1) Load minute-level samples in [start, end].
         let minute_adapter = MetricPodMinuteFsAdapter;
@@ -164,15 +157,16 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         // Ensure chronological order for weighted averaging and counter increase summation.
         rows.sort_by_key(|r| r.time);
 
-        let first = rows.first().unwrap();
         let last = rows.last().unwrap();
 
         // --- Time-weighted average for gauge metrics (state values).
         // We assume each sample holds its value until the next sample timestamp.
         // This is robust to missing samples and irregular sampling intervals.
         let twa_u64 = |f: fn(&MetricPodEntity) -> Option<u64>| -> Option<u64> {
-            let mut pts: Vec<(DateTime<Utc>, u64)> =
-                rows.iter().filter_map(|r| f(r).map(|v| (r.time, v))).collect();
+            let mut pts: Vec<(DateTime<Utc>, u64)> = rows
+                .iter()
+                .filter_map(|r| f(r).map(|v| (r.time, v)))
+                .collect();
 
             if pts.is_empty() {
                 return None;
@@ -230,7 +224,11 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
                 prev = Some(cur);
             }
 
-            if has_pair { Some(acc) } else { None }
+            if has_pair {
+                Some(acc)
+            } else {
+                None
+            }
         };
 
         // --- Supply/capacity snapshots: prefer max (conservative), fallback to last.
@@ -244,7 +242,9 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
 
             // CPU
             cpu_usage_nano_cores: twa_u64(|r| r.cpu_usage_nano_cores),
-            cpu_usage_core_nano_seconds: sum_increase_reset_aware(|r| r.cpu_usage_core_nano_seconds),
+            cpu_usage_core_nano_seconds: sum_increase_reset_aware(|r| {
+                r.cpu_usage_core_nano_seconds
+            }),
 
             // Memory
             memory_usage_bytes: twa_u64(|r| r.memory_usage_bytes),
@@ -277,7 +277,6 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         Ok(())
     }
 
-
     fn cleanup_old(&self, pod_uid: &str, before: DateTime<Utc>) -> Result<()> {
         const BATCH_SIZE: usize = 200;
         let dir = metric_k8s_pod_key_hour_dir_path(pod_uid);
@@ -286,8 +285,14 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         }
 
         // Normalize cutoff to YYYY-MM-01
-        let before_month = NaiveDate::from_ymd_opt(before.year(), before.month(), 1)
-            .ok_or_else(|| anyhow!("Invalid 'before' month {}-{}", before.year(), before.month()))?;
+        let before_month =
+            NaiveDate::from_ymd_opt(before.year(), before.month(), 1).ok_or_else(|| {
+                anyhow!(
+                    "Invalid 'before' month {}-{}",
+                    before.year(),
+                    before.month()
+                )
+            })?;
 
         let mut batch: Vec<PathBuf> = Vec::with_capacity(BATCH_SIZE);
 
@@ -303,10 +308,7 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
             let stem = match path.file_stem().and_then(|s| s.to_str()) {
                 Some(s) => s.trim(),
                 None => {
-                    tracing::warn!(
-                    "Skipping file with non-UTF8 name in {:?}",
-                    path
-                );
+                    tracing::warn!("Skipping file with non-UTF8 name in {:?}", path);
                     continue;
                 }
             };
@@ -362,7 +364,6 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         Ok(())
     }
 
-
     fn get_row_between(
         &self,
         start: DateTime<Utc>,
@@ -376,8 +377,8 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         // 1️⃣ Iterate month by month between start and end
         let mut current_date = NaiveDate::from_ymd_opt(start.year(), start.month() as u32, 1)
             .expect("valid start date");
-        let end_date = NaiveDate::from_ymd_opt(end.year(), end.month() as u32, 1)
-            .expect("valid end date");
+        let end_date =
+            NaiveDate::from_ymd_opt(end.year(), end.month() as u32, 1).expect("valid end date");
 
         while current_date <= end_date {
             let path = self.build_path_for(object_name, current_date);
@@ -385,15 +386,16 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
 
             if !path_obj.exists() {
                 tracing::debug!(
-                "Hour metrics file missing for {} at month {}",
-                object_name,
-                current_date.format("%Y-%m")
-            );
+                    "Hour metrics file missing for {} at month {}",
+                    object_name,
+                    current_date.format("%Y-%m")
+                );
                 // Move to next month
                 current_date = if current_date.month() == 12 {
                     NaiveDate::from_ymd_opt(current_date.year() + 1, 1, 1).unwrap()
                 } else {
-                    NaiveDate::from_ymd_opt(current_date.year(), current_date.month() + 1, 1).unwrap()
+                    NaiveDate::from_ymd_opt(current_date.year(), current_date.month() + 1, 1)
+                        .unwrap()
                 };
                 continue;
             }
@@ -405,7 +407,8 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
                     current_date = if current_date.month() == 12 {
                         NaiveDate::from_ymd_opt(current_date.year() + 1, 1, 1).unwrap()
                     } else {
-                        NaiveDate::from_ymd_opt(current_date.year(), current_date.month() + 1, 1).unwrap()
+                        NaiveDate::from_ymd_opt(current_date.year(), current_date.month() + 1, 1)
+                            .unwrap()
                     };
                     continue;
                 }
@@ -420,7 +423,8 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
                 current_date = if current_date.month() == 12 {
                     NaiveDate::from_ymd_opt(current_date.year() + 1, 1, 1).unwrap()
                 } else {
-                    NaiveDate::from_ymd_opt(current_date.year(), current_date.month() + 1, 1).unwrap()
+                    NaiveDate::from_ymd_opt(current_date.year(), current_date.month() + 1, 1)
+                        .unwrap()
                 };
                 continue;
             }
@@ -432,12 +436,25 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
             // Handle header or first data line
             if first_line.starts_with("20") {
                 header = vec![
-                    "TIME", "CPU_USAGE_NANO_CORES", "CPU_USAGE_CORE_NANO_SECONDS",
-                    "MEMORY_USAGE_BYTES", "MEMORY_WORKING_SET_BYTES", "MEMORY_RSS_BYTES",
-                    "MEMORY_PAGE_FAULTS", "NETWORK_PHYSICAL_RX_BYTES", "NETWORK_PHYSICAL_TX_BYTES",
-                    "NETWORK_PHYSICAL_RX_ERRORS", "NETWORK_PHYSICAL_TX_ERRORS",
-                    "ES_USED_BYTES", "ES_CAPACITY_BYTES", "ES_INODES_USED", "ES_INODES",
-                    "PV_USED_BYTES", "PV_CAPACITY_BYTES", "PV_INODES_USED", "PV_INODES"
+                    "TIME",
+                    "CPU_USAGE_NANO_CORES",
+                    "CPU_USAGE_CORE_NANO_SECONDS",
+                    "MEMORY_USAGE_BYTES",
+                    "MEMORY_WORKING_SET_BYTES",
+                    "MEMORY_RSS_BYTES",
+                    "MEMORY_PAGE_FAULTS",
+                    "NETWORK_PHYSICAL_RX_BYTES",
+                    "NETWORK_PHYSICAL_TX_BYTES",
+                    "NETWORK_PHYSICAL_RX_ERRORS",
+                    "NETWORK_PHYSICAL_TX_ERRORS",
+                    "ES_USED_BYTES",
+                    "ES_CAPACITY_BYTES",
+                    "ES_INODES_USED",
+                    "ES_INODES",
+                    "PV_USED_BYTES",
+                    "PV_CAPACITY_BYTES",
+                    "PV_INODES_USED",
+                    "PV_INODES",
                 ];
 
                 if let Some(row) = Self::parse_line(&header, &first_line) {
@@ -480,16 +497,15 @@ impl MetricFsAdapterBase<MetricPodEntity> for MetricPodHourFsAdapter {
         let slice: Vec<_> = data.into_iter().skip(start_idx).take(limit).collect();
 
         tracing::debug!(
-        "Returning {} hour rows for {} between {} and {}",
-        slice.len(),
-        object_name,
-        start,
-        end
-    );
+            "Returning {} hour rows for {} between {} and {}",
+            slice.len(),
+            object_name,
+            start,
+            end
+        );
 
         Ok(slice)
     }
-
 
     fn get_column_between(
         &self,

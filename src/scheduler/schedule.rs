@@ -1,19 +1,16 @@
 use super::tasks::{day_task, hour_task, minute_task};
 // src/scheduler/schedule.rs
+use crate::app_state::AppState;
 use anyhow::Result;
+use chrono::Duration as ChronoDuration;
 use chrono::{Timelike, Utc};
 use tokio::sync::broadcast;
 use tokio::time::{interval, sleep, Duration, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
-use chrono::{Duration as ChronoDuration};
-use crate::app_state::AppState;
 
 /// Entry point — start all periodic background tasks.
 /// Call this once from your main() function.
-pub async fn scheduler_start_all_tasks(
-    state: AppState,
-    mut shutdown: broadcast::Receiver<()>
-) {
+pub async fn scheduler_start_all_tasks(state: AppState, mut shutdown: broadcast::Receiver<()>) {
     info!("Starting scheduler tasks...");
 
     let mut s1 = shutdown.resubscribe();
@@ -22,7 +19,7 @@ pub async fn scheduler_start_all_tasks(
 
     // Minute loop
     tokio::spawn({
-        let state = state.clone();  // ✔ each spawn gets its own clone
+        let state = state.clone(); // ✔ each spawn gets its own clone
         async move {
             run_minute_loop(state, &mut s1).await;
         }
@@ -30,17 +27,15 @@ pub async fn scheduler_start_all_tasks(
 
     // Hour loop
     tokio::spawn({
-        let state = state.clone();  // ✔ another clone
         async move {
-            run_hour_loop(state, &mut s2).await;
+            run_hour_loop(&mut s2).await;
         }
     });
 
     // Day loop
     tokio::spawn({
-        let state = state.clone();  // ✔ another clone
         async move {
-            run_day_loop(state, &mut s3).await;
+            run_day_loop(&mut s3).await;
         }
     });
 
@@ -49,10 +44,7 @@ pub async fn scheduler_start_all_tasks(
 }
 
 /// Runs every aligned minute (e.g., 12:00:00, 12:01:00 …)
-pub async fn run_minute_loop(
-    state: AppState,
-    shutdown: &mut broadcast::Receiver<()>
-) {
+pub async fn run_minute_loop(state: AppState, shutdown: &mut broadcast::Receiver<()>) {
     align_to_next_minute().await;
     let mut ticker = interval(Duration::from_secs(60));
     ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -60,7 +52,6 @@ pub async fn run_minute_loop(
     loop {
         tokio::select! {
             _ = ticker.tick() => {
-                let state_clone = state.clone();
                 let task = {
                     let state = state.clone();
                     move || {
@@ -81,7 +72,7 @@ pub async fn run_minute_loop(
 }
 
 /// Runs an hour loop that fires at HH:00:30 each hour (e.g., 01:00:30, 02:00:30 …)
-pub async fn run_hour_loop(state: AppState, shutdown: &mut broadcast::Receiver<()>) {
+pub async fn run_hour_loop(shutdown: &mut broadcast::Receiver<()>) {
     align_to_next_hour_plus_30s().await;
 
     let mut ticker = interval(Duration::from_secs(3600));
@@ -103,7 +94,7 @@ pub async fn run_hour_loop(state: AppState, shutdown: &mut broadcast::Receiver<(
 }
 
 /// Runs day at 00:30:30 UTC.
-pub async fn run_day_loop(state: AppState, shutdown: &mut broadcast::Receiver<()>) {
+pub async fn run_day_loop(shutdown: &mut broadcast::Receiver<()>) {
     align_to_next_midnight_plus_30m30s().await;
 
     let mut ticker = interval(Duration::from_secs(86_400)); // 24h

@@ -5,10 +5,6 @@ use crate::api::dto::paginated_response::PaginatedResponse;
 use crate::core::client::k8s::client_k8s_service;
 use crate::core::client::k8s::util::{build_client, read_token};
 
-pub async fn get_k8s_services() -> Result<PaginatedResponse<Service>> {
-    get_k8s_services_paginated(None, None).await
-}
-
 pub async fn get_k8s_services_paginated(
     limit: Option<usize>,
     offset: Option<usize>,

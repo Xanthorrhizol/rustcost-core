@@ -5,10 +5,6 @@ use crate::api::dto::paginated_response::PaginatedResponse;
 use crate::core::client::k8s::client_k8s_daemonset;
 use crate::core::client::k8s::util::{build_client, read_token};
 
-pub async fn get_k8s_daemonsets() -> Result<PaginatedResponse<DaemonSet>> {
-    get_k8s_daemonsets_paginated(None, None).await
-}
-
 pub async fn get_k8s_daemonsets_paginated(
     limit: Option<usize>,
     offset: Option<usize>,
@@ -44,11 +40,6 @@ pub async fn get_k8s_daemonset(namespace: String, name: String) -> Result<Daemon
     let token = read_token()?;
     let client = build_client()?;
 
-    client_k8s_daemonset::fetch_daemonset_by_name_and_namespace(
-        &token,
-        &client,
-        &namespace,
-        &name,
-    )
-    .await
+    client_k8s_daemonset::fetch_daemonset_by_name_and_namespace(&token, &client, &namespace, &name)
+        .await
 }

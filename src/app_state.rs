@@ -5,124 +5,110 @@ use std::sync::Arc;
 //
 
 // system
-use crate::domain::system::service::status_service::status_internal;
-use crate::domain::system::service::health_service::health;
 use crate::domain::system::service::backup_service::backup;
+use crate::domain::system::service::health_service::health;
 use crate::domain::system::service::resync_service::resync;
+use crate::domain::system::service::status_service::status_internal;
 
 // info
+use crate::domain::info::service::info_alerts_service::{get_info_alerts, upsert_info_alerts};
+use crate::domain::info::service::info_llm_service::{get_info_llm, upsert_info_llm};
+use crate::domain::info::service::info_settings_service::{
+    get_info_settings, upsert_info_settings,
+};
 use crate::domain::info::service::info_unit_price_service::{
     get_info_unit_prices, upsert_info_unit_prices,
 };
 use crate::domain::info::service::info_version_service::get_info_versions;
-use crate::domain::info::service::info_settings_service::{
-    get_info_settings, upsert_info_settings,
-};
-use crate::domain::info::service::info_alerts_service::{
-    get_info_alerts, upsert_info_alerts,
-};
-use crate::domain::info::service::info_llm_service::{
-    get_info_llm, upsert_info_llm,
-};
 use crate::domain::llm::service::llm_chat_service::chat as llm_chat;
 use crate::domain::llm::service::llm_chat_service::chat_with_context as llm_chat_with_context;
 
 // info k8s
-use crate::domain::info::service::info_namespace_service::get_k8s_namespaces;
-use crate::domain::info::service::info_k8s_deployment_service::{
-    get_k8s_deployment, get_k8s_deployments, get_k8s_deployments_paginated,
-};
-use crate::domain::info::service::info_k8s_statefulset_service::{
-    get_k8s_statefulset, get_k8s_statefulsets, get_k8s_statefulsets_paginated,
+use crate::domain::info::service::info_k8s_cronjob_service::{
+    get_k8s_cronjob, get_k8s_cronjobs_paginated,
 };
 use crate::domain::info::service::info_k8s_daemonset_service::{
-    get_k8s_daemonset, get_k8s_daemonsets, get_k8s_daemonsets_paginated,
+    get_k8s_daemonset, get_k8s_daemonsets_paginated,
 };
-use crate::domain::info::service::info_k8s_job_service::{
-    get_k8s_job, get_k8s_jobs, get_k8s_jobs_paginated,
+use crate::domain::info::service::info_k8s_deployment_service::{
+    get_k8s_deployment, get_k8s_deployments_paginated,
 };
-use crate::domain::info::service::info_k8s_cronjob_service::{
-    get_k8s_cronjob, get_k8s_cronjobs, get_k8s_cronjobs_paginated,
-};
-use crate::domain::info::service::info_k8s_service_service::{
-    get_k8s_service, get_k8s_services, get_k8s_services_paginated,
-};
+use crate::domain::info::service::info_k8s_hpa_service::get_k8s_hpas;
 use crate::domain::info::service::info_k8s_ingress_service::{
-    get_k8s_ingress, get_k8s_ingresses, get_k8s_ingresses_paginated,
+    get_k8s_ingress, get_k8s_ingresses_paginated,
+};
+use crate::domain::info::service::info_k8s_job_service::{get_k8s_job, get_k8s_jobs_paginated};
+use crate::domain::info::service::info_k8s_limit_range_service::get_k8s_limit_ranges;
+use crate::domain::info::service::info_k8s_persistent_volume_claim_service::{
+    get_k8s_persistent_volume_claim, get_k8s_persistent_volume_claims_paginated,
 };
 use crate::domain::info::service::info_k8s_persistent_volume_service::{
-    get_k8s_persistent_volume, get_k8s_persistent_volumes, get_k8s_persistent_volumes_paginated,
-};
-use crate::domain::info::service::info_k8s_persistent_volume_claim_service::{
-    get_k8s_persistent_volume_claim, get_k8s_persistent_volume_claims,
-    get_k8s_persistent_volume_claims_paginated,
+    get_k8s_persistent_volume, get_k8s_persistent_volumes_paginated,
 };
 use crate::domain::info::service::info_k8s_resource_quota_service::get_k8s_resource_quotas;
-use crate::domain::info::service::info_k8s_limit_range_service::get_k8s_limit_ranges;
-use crate::domain::info::service::info_k8s_hpa_service::get_k8s_hpas;
+use crate::domain::info::service::info_k8s_service_service::{
+    get_k8s_service, get_k8s_services_paginated,
+};
+use crate::domain::info::service::info_k8s_statefulset_service::{
+    get_k8s_statefulset, get_k8s_statefulsets_paginated,
+};
+use crate::domain::info::service::info_namespace_service::get_k8s_namespaces;
 
+use crate::domain::info::service::info_k8s_container_service::{
+    get_info_k8s_container, list_k8s_containers, patch_info_k8s_container,
+};
+use crate::domain::info::service::info_k8s_live_container_service::{
+    get_k8s_live_container, get_k8s_live_containers_paginated,
+};
+use crate::domain::info::service::info_k8s_live_node_service::{
+    get_k8s_live_node, get_k8s_live_nodes_paginated,
+};
+use crate::domain::info::service::info_k8s_live_pod_service::{
+    get_k8s_live_pod, get_k8s_live_pods_paginated,
+};
 use crate::domain::info::service::info_k8s_node_service::{
-    get_info_k8s_node,
-    list_k8s_nodes,
-    patch_info_k8s_node_filter,
-    patch_info_k8s_node_price,
+    get_info_k8s_node, list_k8s_nodes, patch_info_k8s_node_filter, patch_info_k8s_node_price,
 };
 use crate::domain::info::service::info_k8s_pod_service::{
     get_info_k8s_pod, list_k8s_pods, patch_info_k8s_pod,
 };
-use crate::domain::info::service::info_k8s_container_service::{
-    get_info_k8s_container, list_k8s_containers, patch_info_k8s_container,
-};
-use crate::domain::info::service::info_k8s_live_node_service::{
-    get_k8s_live_node,
-    get_k8s_live_nodes_paginated,
-};
-use crate::domain::info::service::info_k8s_live_pod_service::{
-    get_k8s_live_pod,
-    get_k8s_live_pods_paginated,
-};
-use crate::domain::info::service::info_k8s_live_container_service::{
-    get_k8s_live_container,
-    get_k8s_live_containers_paginated,
-};
 
 // metrics
-use crate::domain::metric::k8s::pod::service::*;
-use crate::domain::metric::k8s::node::service::*;
-use crate::domain::metric::k8s::namespace::service::*;
-use crate::domain::metric::k8s::deployment::service::*;
-use crate::domain::metric::k8s::container::service::*;
 use crate::domain::metric::k8s::cluster::service::*;
+use crate::domain::metric::k8s::container::service::*;
+use crate::domain::metric::k8s::deployment::service::*;
+use crate::domain::metric::k8s::namespace::service::*;
+use crate::domain::metric::k8s::node::service::*;
+use crate::domain::metric::k8s::pod::service::*;
 
 // entities
-use crate::core::persistence::info::fixed::unit_price::info_unit_price_entity::InfoUnitPriceEntity;
-use crate::core::persistence::info::fixed::version::info_version_entity::InfoVersionEntity;
-use crate::core::persistence::info::fixed::setting::info_setting_entity::InfoSettingEntity;
 use crate::core::persistence::info::fixed::alerts::info_alert_entity::InfoAlertEntity;
 use crate::core::persistence::info::fixed::llm::info_llm_entity::InfoLlmEntity;
+use crate::core::persistence::info::fixed::setting::info_setting_entity::InfoSettingEntity;
+use crate::core::persistence::info::fixed::unit_price::info_unit_price_entity::InfoUnitPriceEntity;
+use crate::core::persistence::info::fixed::version::info_version_entity::InfoVersionEntity;
 
+use crate::core::persistence::info::k8s::container::info_container_entity::InfoContainerEntity;
 use crate::core::persistence::info::k8s::node::info_node_entity::InfoNodeEntity;
 use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
-use crate::core::persistence::info::k8s::container::info_container_entity::InfoContainerEntity;
 
 // dtos
-use crate::domain::info::dto::info_unit_price_upsert_request::InfoUnitPriceUpsertRequest;
-use crate::domain::info::dto::info_setting_upsert_request::InfoSettingUpsertRequest;
 use crate::domain::info::dto::info_alert_upsert_request::InfoAlertUpsertRequest;
-use crate::domain::llm::dto::llm_chat_request::LlmChatRequest;
-use crate::domain::llm::dto::llm_chat_with_context_request::LlmChatWithContextRequest;
-use crate::domain::info::dto::info_llm_upsert_request::InfoLlmUpsertRequest;
+use crate::domain::info::dto::info_k8s_container_patch_request::InfoK8sContainerPatchRequest;
 use crate::domain::info::dto::info_k8s_node_patch_request::{
-    InfoK8sNodePatchRequest,
-    InfoK8sNodePricePatchRequest,
+    InfoK8sNodePatchRequest, InfoK8sNodePricePatchRequest,
 };
 use crate::domain::info::dto::info_k8s_pod_patch_request::InfoK8sPodPatchRequest;
-use crate::domain::info::dto::info_k8s_container_patch_request::InfoK8sContainerPatchRequest;
+use crate::domain::info::dto::info_llm_upsert_request::InfoLlmUpsertRequest;
+use crate::domain::info::dto::info_setting_upsert_request::InfoSettingUpsertRequest;
+use crate::domain::info::dto::info_unit_price_upsert_request::InfoUnitPriceUpsertRequest;
+use crate::domain::llm::dto::llm_chat_request::LlmChatRequest;
+use crate::domain::llm::dto::llm_chat_with_context_request::LlmChatWithContextRequest;
 
 use crate::api::dto::info_dto::{K8sListNodeQuery, K8sListQuery};
 use crate::api::dto::k8s_pod_query_request_dto::K8sPodQueryRequestDto;
-use crate::api::dto::paginated_response::PaginatedResponse;
 use crate::api::dto::metrics_dto::RangeQuery;
+use crate::api::dto::paginated_response::PaginatedResponse;
 
 // logs
 use crate::core::persistence::logs::log_repository::LogRepositoryImpl;
@@ -131,28 +117,6 @@ use crate::core::state::runtime::alerts::alert_runtime_state_repository::AlertRu
 use crate::core::state::runtime::k8s::k8s_runtime_state_manager::K8sRuntimeStateManager;
 use crate::core::state::runtime::k8s::k8s_runtime_state_repository::K8sRuntimeStateRepository;
 use crate::domain::system::service::log_service::LogService;
-
-//
-// ============================================================
-// CORE MACRO
-// ============================================================
-//
-macro_rules! delegate_async_service {
-    ($(fn $name:ident($($arg:ident : $typ:ty),*) -> $ret:ty => $path:path;)+) => {
-        $(
-            pub async fn $name(&self, $($arg: $typ),*) -> anyhow::Result<$ret> {
-                $path($($arg),*).await
-            }
-        )+
-    };
-    ($(fn $name:ident($($arg:ident : $typ:ty),*) -> $ret:ty => $expr:expr;)+) => {
-        $(
-            pub async fn $name(&self, $($arg: $typ),*) -> anyhow::Result<$ret> {
-                $expr.await
-            }
-        )+
-    };
-}
 
 //
 // ============================================================
@@ -170,7 +134,7 @@ pub struct AppState {
 
     // runtime state managers
     pub k8s_state: Arc<K8sRuntimeStateManager<K8sRuntimeStateRepository>>,
-    pub alerts: Arc<AlertRuntimeStateManager<AlertRuntimeStateRepository>>
+    pub alerts: Arc<AlertRuntimeStateManager<AlertRuntimeStateRepository>>,
 }
 
 pub fn build_app_state() -> AppState {
@@ -210,9 +174,11 @@ impl SystemService {
         Self { k8s_state }
     }
 
-    delegate_async_service! {
-        fn health() -> serde_json::Value => health;
-        fn backup() -> serde_json::Value => backup;
+    pub async fn health(&self) -> anyhow::Result<serde_json::Value> {
+        health().await
+    }
+    pub async fn backup(&self) -> anyhow::Result<serde_json::Value> {
+        backup().await
     }
     pub async fn status(&self) -> anyhow::Result<serde_json::Value> {
         status_internal(self.k8s_state.clone()).await
@@ -231,20 +197,48 @@ impl SystemService {
 pub struct InfoService;
 
 impl InfoService {
-    delegate_async_service! {
-        fn get_info_unit_prices() -> InfoUnitPriceEntity => get_info_unit_prices;
-        fn upsert_info_unit_prices(req: InfoUnitPriceUpsertRequest) -> serde_json::Value => upsert_info_unit_prices;
+    pub async fn get_info_unit_prices(&self) -> anyhow::Result<InfoUnitPriceEntity> {
+        get_info_unit_prices().await
+    }
+    pub async fn upsert_info_unit_prices(
+        &self,
+        req: InfoUnitPriceUpsertRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        upsert_info_unit_prices(req).await
+    }
 
-        fn get_info_versions() -> InfoVersionEntity => get_info_versions;
+    pub async fn get_info_versions(&self) -> anyhow::Result<InfoVersionEntity> {
+        get_info_versions().await
+    }
 
-        fn get_info_alerts() -> InfoAlertEntity => get_info_alerts;
-        fn upsert_info_alerts(req: InfoAlertUpsertRequest) -> serde_json::Value => upsert_info_alerts;
+    pub async fn get_info_alerts(&self) -> anyhow::Result<InfoAlertEntity> {
+        get_info_alerts().await
+    }
+    pub async fn upsert_info_alerts(
+        &self,
+        req: InfoAlertUpsertRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        upsert_info_alerts(req).await
+    }
 
-        fn get_info_llm() -> InfoLlmEntity => get_info_llm;
-        fn upsert_info_llm(req: InfoLlmUpsertRequest) -> serde_json::Value => upsert_info_llm;
+    pub async fn get_info_llm(&self) -> anyhow::Result<InfoLlmEntity> {
+        get_info_llm().await
+    }
+    pub async fn upsert_info_llm(
+        &self,
+        req: InfoLlmUpsertRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        upsert_info_llm(req).await
+    }
 
-        fn get_info_settings() -> InfoSettingEntity => get_info_settings;
-        fn upsert_info_settings(req: InfoSettingUpsertRequest) -> serde_json::Value => upsert_info_settings;
+    pub async fn get_info_settings(&self) -> anyhow::Result<InfoSettingEntity> {
+        get_info_settings().await
+    }
+    pub async fn upsert_info_settings(
+        &self,
+        req: InfoSettingUpsertRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        upsert_info_settings(req).await
     }
 }
 
@@ -257,9 +251,14 @@ impl InfoService {
 pub struct LlmService;
 
 impl LlmService {
-    delegate_async_service! {
-        fn chat(payload: LlmChatRequest) -> serde_json::Value => llm_chat;
-        fn chat_with_context(payload: LlmChatWithContextRequest) -> serde_json::Value => llm_chat_with_context;
+    pub async fn chat(&self, payload: LlmChatRequest) -> anyhow::Result<serde_json::Value> {
+        llm_chat(payload).await
+    }
+    pub async fn chat_with_context(
+        &self,
+        payload: LlmChatWithContextRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        llm_chat_with_context(payload).await
     }
 }
 
@@ -268,72 +267,254 @@ impl LlmService {
 // INFO K8S
 // ============================================================
 //
+// {{{ INFO K8S
 #[derive(Clone, Default)]
 pub struct InfoK8sService;
 
 impl InfoK8sService {
-    delegate_async_service! {
-        fn get_k8s_namespaces() -> serde_json::Value => get_k8s_namespaces;
-        fn get_k8s_deployments() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::apps::v1::Deployment> => get_k8s_deployments;
-        fn get_k8s_deployments_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::apps::v1::Deployment> => get_k8s_deployments_paginated;
-        fn get_k8s_deployment(namespace: String, name: String) -> k8s_openapi::api::apps::v1::Deployment => get_k8s_deployment;
-        fn get_k8s_statefulsets() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::apps::v1::StatefulSet> => get_k8s_statefulsets;
-        fn get_k8s_statefulsets_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::apps::v1::StatefulSet> => get_k8s_statefulsets_paginated;
-        fn get_k8s_statefulset(namespace: String, name: String) -> k8s_openapi::api::apps::v1::StatefulSet => get_k8s_statefulset;
-        fn get_k8s_daemonsets() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::apps::v1::DaemonSet> => get_k8s_daemonsets;
-        fn get_k8s_daemonsets_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::apps::v1::DaemonSet> => get_k8s_daemonsets_paginated;
-        fn get_k8s_daemonset(namespace: String, name: String) -> k8s_openapi::api::apps::v1::DaemonSet => get_k8s_daemonset;
+    pub async fn get_k8s_namespaces(&self) -> anyhow::Result<serde_json::Value> {
+        get_k8s_namespaces().await
+    }
+    pub async fn get_k8s_deployments_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::apps::v1::Deployment>> {
+        get_k8s_deployments_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_deployment(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::apps::v1::Deployment> {
+        get_k8s_deployment(namespace, name).await
+    }
+    pub async fn get_k8s_statefulsets_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::apps::v1::StatefulSet>> {
+        get_k8s_statefulsets_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_statefulset(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::apps::v1::StatefulSet> {
+        get_k8s_statefulset(namespace, name).await
+    }
+    pub async fn get_k8s_daemonsets_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::apps::v1::DaemonSet>> {
+        get_k8s_daemonsets_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_daemonset(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::apps::v1::DaemonSet> {
+        get_k8s_daemonset(namespace, name).await
+    }
 
-        fn get_k8s_jobs() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::batch::v1::Job> => get_k8s_jobs;
-        fn get_k8s_jobs_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::batch::v1::Job> => get_k8s_jobs_paginated;
-        fn get_k8s_job(namespace: String, name: String) -> k8s_openapi::api::batch::v1::Job => get_k8s_job;
+    pub async fn get_k8s_jobs_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::batch::v1::Job>> {
+        get_k8s_jobs_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_job(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::batch::v1::Job> {
+        get_k8s_job(namespace, name).await
+    }
 
-        fn get_k8s_cronjobs() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::batch::v1::CronJob> => get_k8s_cronjobs;
-        fn get_k8s_cronjobs_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::batch::v1::CronJob> => get_k8s_cronjobs_paginated;
-        fn get_k8s_cronjob(namespace: String, name: String) -> k8s_openapi::api::batch::v1::CronJob => get_k8s_cronjob;
+    pub async fn get_k8s_cronjobs_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::batch::v1::CronJob>> {
+        get_k8s_cronjobs_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_cronjob(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::batch::v1::CronJob> {
+        get_k8s_cronjob(namespace, name).await
+    }
 
-        fn get_k8s_services() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::core::v1::Service> => get_k8s_services;
-        fn get_k8s_services_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::core::v1::Service> => get_k8s_services_paginated;
-        fn get_k8s_service(namespace: String, name: String) -> k8s_openapi::api::core::v1::Service => get_k8s_service;
+    pub async fn get_k8s_services_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::core::v1::Service>> {
+        get_k8s_services_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_service(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::core::v1::Service> {
+        get_k8s_service(namespace, name).await
+    }
 
-        fn get_k8s_ingresses() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::networking::v1::Ingress> => get_k8s_ingresses;
-        fn get_k8s_ingresses_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::networking::v1::Ingress> => get_k8s_ingresses_paginated;
-        fn get_k8s_ingress(namespace: String, name: String) -> k8s_openapi::api::networking::v1::Ingress => get_k8s_ingress;
+    pub async fn get_k8s_ingresses_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::networking::v1::Ingress>> {
+        get_k8s_ingresses_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_ingress(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::networking::v1::Ingress> {
+        get_k8s_ingress(namespace, name).await
+    }
 
-        fn get_k8s_persistent_volumes() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::core::v1::PersistentVolume> => get_k8s_persistent_volumes;
-        fn get_k8s_persistent_volumes_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::core::v1::PersistentVolume> => get_k8s_persistent_volumes_paginated;
-        fn get_k8s_persistent_volume(name: String) -> k8s_openapi::api::core::v1::PersistentVolume => get_k8s_persistent_volume;
+    pub async fn get_k8s_persistent_volumes_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::core::v1::PersistentVolume>> {
+        get_k8s_persistent_volumes_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_persistent_volume(
+        &self,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::core::v1::PersistentVolume> {
+        get_k8s_persistent_volume(name).await
+    }
 
-        fn get_k8s_persistent_volume_claims() -> crate::api::dto::paginated_response::PaginatedResponse<k8s_openapi::api::core::v1::PersistentVolumeClaim> => get_k8s_persistent_volume_claims;
-        fn get_k8s_persistent_volume_claims_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::core::v1::PersistentVolumeClaim> => get_k8s_persistent_volume_claims_paginated;
-        fn get_k8s_persistent_volume_claim(namespace: String, name: String) -> k8s_openapi::api::core::v1::PersistentVolumeClaim => get_k8s_persistent_volume_claim;
-        fn get_k8s_resource_quotas() -> serde_json::Value => get_k8s_resource_quotas;
-        fn get_k8s_limit_ranges() -> serde_json::Value => get_k8s_limit_ranges;
-        fn get_k8s_hpas() -> serde_json::Value => get_k8s_hpas;
+    pub async fn get_k8s_persistent_volume_claims_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::core::v1::PersistentVolumeClaim>> {
+        get_k8s_persistent_volume_claims_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_persistent_volume_claim(
+        &self,
+        namespace: String,
+        name: String,
+    ) -> anyhow::Result<k8s_openapi::api::core::v1::PersistentVolumeClaim> {
+        get_k8s_persistent_volume_claim(namespace, name).await
+    }
+    pub async fn get_k8s_resource_quotas(&self) -> anyhow::Result<serde_json::Value> {
+        get_k8s_resource_quotas().await
+    }
+    pub async fn get_k8s_limit_ranges(&self) -> anyhow::Result<serde_json::Value> {
+        get_k8s_limit_ranges().await
+    }
+    pub async fn get_k8s_hpas(&self) -> anyhow::Result<serde_json::Value> {
+        get_k8s_hpas().await
+    }
 
-        fn get_k8s_live_nodes_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::core::v1::Node> => get_k8s_live_nodes_paginated;
-        fn get_k8s_live_node(node_name: String) -> k8s_openapi::api::core::v1::Node => get_k8s_live_node;
+    pub async fn get_k8s_live_nodes_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::core::v1::Node>> {
+        get_k8s_live_nodes_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_live_node(
+        &self,
+        node_name: String,
+    ) -> anyhow::Result<k8s_openapi::api::core::v1::Node> {
+        get_k8s_live_node(node_name).await
+    }
 
-        fn get_k8s_live_pods_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<k8s_openapi::api::core::v1::Pod> => get_k8s_live_pods_paginated;
-        fn get_k8s_live_pod(pod_uid: String) -> k8s_openapi::api::core::v1::Pod => get_k8s_live_pod;
+    pub async fn get_k8s_live_pods_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<k8s_openapi::api::core::v1::Pod>> {
+        get_k8s_live_pods_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_live_pod(
+        &self,
+        pod_uid: String,
+    ) -> anyhow::Result<k8s_openapi::api::core::v1::Pod> {
+        get_k8s_live_pod(pod_uid).await
+    }
 
-        fn get_k8s_live_containers_paginated(limit: Option<usize>, offset: Option<usize>) -> PaginatedResponse<InfoContainerEntity> => get_k8s_live_containers_paginated;
-        fn get_k8s_live_container(id: String) -> InfoContainerEntity => get_k8s_live_container;
+    pub async fn get_k8s_live_containers_paginated(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<PaginatedResponse<InfoContainerEntity>> {
+        get_k8s_live_containers_paginated(limit, offset).await
+    }
+    pub async fn get_k8s_live_container(&self, id: String) -> anyhow::Result<InfoContainerEntity> {
+        get_k8s_live_container(id).await
+    }
 
-        fn get_info_k8s_node(node_name: String) -> InfoNodeEntity => get_info_k8s_node;
-        fn list_k8s_nodes(filter: K8sListNodeQuery) -> Vec<InfoNodeEntity> => list_k8s_nodes;
-        fn patch_info_k8s_node_filter(id: String, patch: InfoK8sNodePatchRequest) -> serde_json::Value => patch_info_k8s_node_filter;
-        fn patch_info_k8s_node_price(id: String, patch: InfoK8sNodePricePatchRequest) -> serde_json::Value => patch_info_k8s_node_price;
+    pub async fn get_info_k8s_node(&self, node_name: String) -> anyhow::Result<InfoNodeEntity> {
+        get_info_k8s_node(node_name).await
+    }
+    pub async fn list_k8s_nodes(
+        &self,
+        filter: K8sListNodeQuery,
+    ) -> anyhow::Result<Vec<InfoNodeEntity>> {
+        list_k8s_nodes(filter).await
+    }
+    pub async fn patch_info_k8s_node_filter(
+        &self,
+        id: String,
+        patch: InfoK8sNodePatchRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        patch_info_k8s_node_filter(id, patch).await
+    }
+    pub async fn patch_info_k8s_node_price(
+        &self,
+        id: String,
+        patch: InfoK8sNodePricePatchRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        patch_info_k8s_node_price(id, patch).await
+    }
 
-        fn get_info_k8s_pod(pod_uid: String) -> InfoPodEntity => get_info_k8s_pod;
-        fn list_k8s_pods(state: AppState, filter: K8sPodQueryRequestDto) -> PaginatedResponse<InfoPodEntity> => list_k8s_pods;
-        fn patch_info_k8s_pod(id: String, payload: InfoK8sPodPatchRequest) -> serde_json::Value => patch_info_k8s_pod;
+    pub async fn get_info_k8s_pod(&self, pod_uid: String) -> anyhow::Result<InfoPodEntity> {
+        get_info_k8s_pod(pod_uid).await
+    }
+    pub async fn list_k8s_pods(
+        &self,
+        state: AppState,
+        filter: K8sPodQueryRequestDto,
+    ) -> anyhow::Result<PaginatedResponse<InfoPodEntity>> {
+        list_k8s_pods(state, filter).await
+    }
+    pub async fn patch_info_k8s_pod(
+        &self,
+        id: String,
+        payload: InfoK8sPodPatchRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        patch_info_k8s_pod(id, payload).await
+    }
 
-        fn get_info_k8s_container(id: String) -> InfoContainerEntity => get_info_k8s_container;
-        fn list_k8s_containers(filter: K8sListQuery) -> Vec<InfoContainerEntity> => list_k8s_containers;
-        fn patch_info_k8s_container(id: String, payload: InfoK8sContainerPatchRequest) -> serde_json::Value => patch_info_k8s_container;
+    pub async fn get_info_k8s_container(&self, id: String) -> anyhow::Result<InfoContainerEntity> {
+        get_info_k8s_container(id).await
+    }
+    pub async fn list_k8s_containers(
+        &self,
+        filter: K8sListQuery,
+    ) -> anyhow::Result<Vec<InfoContainerEntity>> {
+        list_k8s_containers(filter).await
+    }
+    pub async fn patch_info_k8s_container(
+        &self,
+        id: String,
+        payload: InfoK8sContainerPatchRequest,
+    ) -> anyhow::Result<serde_json::Value> {
+        patch_info_k8s_container(id, payload).await
     }
 }
+// }}}
 
 //
 // ============================================================
@@ -344,86 +525,445 @@ impl InfoK8sService {
 pub struct MetricService;
 
 impl MetricService {
-    delegate_async_service! {
-        fn get_metric_k8s_pods_raw(q: RangeQuery, pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_raw;
-        fn get_metric_k8s_pods_raw_summary(q: RangeQuery, pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_raw_summary;
-        fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_raw_efficiency;
+    pub async fn get_metric_k8s_pods_raw(
+        &self,
+        q: RangeQuery,
+        pod_uids: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pods_raw(q, pod_uids).await
+    }
 
-        fn get_metric_k8s_pod_raw(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_raw;
-        fn get_metric_k8s_pod_raw_summary(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_raw_summary;
-        fn get_metric_k8s_pod_raw_efficiency(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_raw_efficiency;
+    pub async fn get_metric_k8s_pods_raw_summary(
+        &self,
+        q: RangeQuery,
+        pod_uids: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pods_raw_summary(q, pod_uids).await
+    }
+    pub async fn get_metric_k8s_pods_raw_efficiency(
+        &self,
+        q: RangeQuery,
+        _pod_uids: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pods_raw_efficiency(q, _pod_uids).await
+    }
 
-        fn get_metric_k8s_pods_cost(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_cost;
-        fn get_metric_k8s_pods_cost_summary(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_cost_summary;
-        fn get_metric_k8s_pods_cost_trend(q: RangeQuery, _pod_uids: Vec<String>) -> serde_json::Value => get_metric_k8s_pods_cost_trend;
+    pub async fn get_metric_k8s_pod_raw(
+        &self,
+        pod_uid: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pod_raw(pod_uid, q).await
+    }
+    pub async fn get_metric_k8s_pod_raw_summary(
+        &self,
+        pod_uid: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pod_raw_summary(pod_uid, q).await
+    }
+    pub async fn get_metric_k8s_pod_raw_efficiency(
+        &self,
+        pod_uid: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pod_raw_efficiency(pod_uid, q).await
+    }
 
-        fn get_metric_k8s_pod_cost(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_cost;
-        fn get_metric_k8s_pod_cost_summary(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_cost_summary;
-        fn get_metric_k8s_pod_cost_trend(pod_uid: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_pod_cost_trend;
+    pub async fn get_metric_k8s_pods_cost(
+        &self,
+        q: RangeQuery,
+        _pod_uids: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pods_cost(q, _pod_uids).await
+    }
+    pub async fn get_metric_k8s_pods_cost_summary(
+        &self,
+        q: RangeQuery,
+        _pod_uids: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pods_cost_summary(q, _pod_uids).await
+    }
+    pub async fn get_metric_k8s_pods_cost_trend(
+        &self,
+        q: RangeQuery,
+        _pod_uids: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pods_cost_trend(q, _pod_uids).await
+    }
 
-        fn get_metric_k8s_nodes_raw(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_raw;
-        fn get_metric_k8s_nodes_raw_summary(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_raw_summary;
-        fn get_metric_k8s_nodes_raw_efficiency(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_raw_efficiency;
+    pub async fn get_metric_k8s_pod_cost(
+        &self,
+        pod_uid: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pod_cost(pod_uid, q).await
+    }
+    pub async fn get_metric_k8s_pod_cost_summary(
+        &self,
+        pod_uid: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pod_cost_summary(pod_uid, q).await
+    }
+    pub async fn get_metric_k8s_pod_cost_trend(
+        &self,
+        pod_uid: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_pod_cost_trend(pod_uid, q).await
+    }
 
-        fn get_metric_k8s_node_raw(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_raw;
-        fn get_metric_k8s_node_raw_summary(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_raw_summary;
-        fn get_metric_k8s_node_raw_efficiency(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_raw_efficiency;
+    pub async fn get_metric_k8s_nodes_raw(
+        &self,
+        q: RangeQuery,
+        node_names: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_nodes_raw(q, node_names).await
+    }
+    pub async fn get_metric_k8s_nodes_raw_summary(
+        &self,
+        q: RangeQuery,
+        node_names: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_nodes_raw_summary(q, node_names).await
+    }
+    pub async fn get_metric_k8s_nodes_raw_efficiency(
+        &self,
+        q: RangeQuery,
+        node_names: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_nodes_raw_efficiency(q, node_names).await
+    }
 
-        fn get_metric_k8s_nodes_cost(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_cost;
-        fn get_metric_k8s_nodes_cost_summary(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_cost_summary;
-        fn get_metric_k8s_nodes_cost_trend(q: RangeQuery, node_names: Vec<String>) -> serde_json::Value => get_metric_k8s_nodes_cost_trend;
+    pub async fn get_metric_k8s_node_raw(
+        &self,
+        node_name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_node_raw(node_name, q).await
+    }
+    pub async fn get_metric_k8s_node_raw_summary(
+        &self,
+        node_name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_node_raw_summary(node_name, q).await
+    }
+    pub async fn get_metric_k8s_node_raw_efficiency(
+        &self,
+        node_name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_node_raw_efficiency(node_name, q).await
+    }
 
-        fn get_metric_k8s_node_cost(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_cost;
-        fn get_metric_k8s_node_cost_summary(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_cost_summary;
-        fn get_metric_k8s_node_cost_trend(node_name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_node_cost_trend;
+    pub async fn get_metric_k8s_nodes_cost(
+        &self,
+        q: RangeQuery,
+        node_names: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_nodes_cost(q, node_names).await
+    }
+    pub async fn get_metric_k8s_nodes_cost_summary(
+        &self,
+        q: RangeQuery,
+        node_names: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_nodes_cost_summary(q, node_names).await
+    }
+    pub async fn get_metric_k8s_nodes_cost_trend(
+        &self,
+        q: RangeQuery,
+        node_names: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_nodes_cost_trend(q, node_names).await
+    }
 
-        fn get_metric_k8s_namespaces_raw(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_raw;
-        fn get_metric_k8s_namespaces_raw_summary(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_raw_summary;
-        fn get_metric_k8s_namespaces_raw_efficiency(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_raw_efficiency;
+    pub async fn get_metric_k8s_node_cost(
+        &self,
+        node_name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_node_cost(node_name, q).await
+    }
+    pub async fn get_metric_k8s_node_cost_summary(
+        &self,
+        node_name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_node_cost_summary(node_name, q).await
+    }
+    pub async fn get_metric_k8s_node_cost_trend(
+        &self,
+        node_name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_node_cost_trend(node_name, q).await
+    }
 
-        fn get_metric_k8s_namespace_raw(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_raw;
-        fn get_metric_k8s_namespace_raw_summary(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_raw_summary;
-        fn get_metric_k8s_namespace_raw_efficiency(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_raw_efficiency;
+    pub async fn get_metric_k8s_namespaces_raw(
+        &self,
+        q: RangeQuery,
+        namespaces: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespaces_raw(q, namespaces).await
+    }
+    pub async fn get_metric_k8s_namespaces_raw_summary(
+        &self,
+        q: RangeQuery,
+        namespaces: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespaces_raw_summary(q, namespaces).await
+    }
+    pub async fn get_metric_k8s_namespaces_raw_efficiency(
+        &self,
+        q: RangeQuery,
+        namespaces: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespaces_raw_efficiency(q, namespaces).await
+    }
 
-        fn get_metric_k8s_namespaces_cost(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_cost;
-        fn get_metric_k8s_namespaces_cost_summary(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_cost_summary;
-        fn get_metric_k8s_namespaces_cost_trend(q: RangeQuery, namespaces: Vec<String>) -> serde_json::Value => get_metric_k8s_namespaces_cost_trend;
+    pub async fn get_metric_k8s_namespace_raw(
+        &self,
+        ns: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespace_raw(ns, q).await
+    }
+    pub async fn get_metric_k8s_namespace_raw_summary(
+        &self,
+        ns: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespace_raw_summary(ns, q).await
+    }
+    pub async fn get_metric_k8s_namespace_raw_efficiency(
+        &self,
+        ns: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespace_raw_efficiency(ns, q).await
+    }
 
-        fn get_metric_k8s_namespace_cost(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_cost;
-        fn get_metric_k8s_namespace_cost_summary(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_cost_summary;
-        fn get_metric_k8s_namespace_cost_trend(ns: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_namespace_cost_trend;
+    pub async fn get_metric_k8s_namespaces_cost(
+        &self,
+        q: RangeQuery,
+        namespaces: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespaces_cost(q, namespaces).await
+    }
+    pub async fn get_metric_k8s_namespaces_cost_summary(
+        &self,
+        q: RangeQuery,
+        namespaces: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespaces_cost_summary(q, namespaces).await
+    }
+    pub async fn get_metric_k8s_namespaces_cost_trend(
+        &self,
+        q: RangeQuery,
+        namespaces: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespaces_cost_trend(q, namespaces).await
+    }
 
-        fn get_metric_k8s_deployments_raw(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_raw;
-        fn get_metric_k8s_deployments_raw_summary(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_raw_summary;
-        fn get_metric_k8s_deployments_raw_efficiency(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_raw_efficiency;
+    pub async fn get_metric_k8s_namespace_cost(
+        &self,
+        ns: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespace_cost(ns, q).await
+    }
+    pub async fn get_metric_k8s_namespace_cost_summary(
+        &self,
+        ns: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespace_cost_summary(ns, q).await
+    }
+    pub async fn get_metric_k8s_namespace_cost_trend(
+        &self,
+        ns: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_namespace_cost_trend(ns, q).await
+    }
 
-        fn get_metric_k8s_deployment_raw(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_raw;
-        fn get_metric_k8s_deployment_raw_summary(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_raw_summary;
-        fn get_metric_k8s_deployment_raw_efficiency(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_raw_efficiency;
+    pub async fn get_metric_k8s_deployments_raw(
+        &self,
+        q: RangeQuery,
+        deployments: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployments_raw(q, deployments).await
+    }
+    pub async fn get_metric_k8s_deployments_raw_summary(
+        &self,
+        q: RangeQuery,
+        deployments: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployments_raw_summary(q, deployments).await
+    }
+    pub async fn get_metric_k8s_deployments_raw_efficiency(
+        &self,
+        q: RangeQuery,
+        deployments: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployments_raw_efficiency(q, deployments).await
+    }
 
-        fn get_metric_k8s_deployments_cost(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_cost;
-        fn get_metric_k8s_deployments_cost_summary(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_cost_summary;
-        fn get_metric_k8s_deployments_cost_trend(q: RangeQuery, deployments: Vec<String>) -> serde_json::Value => get_metric_k8s_deployments_cost_trend;
+    pub async fn get_metric_k8s_deployment_raw(
+        &self,
+        name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployment_raw(name, q).await
+    }
+    pub async fn get_metric_k8s_deployment_raw_summary(
+        &self,
+        name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployment_raw_summary(name, q).await
+    }
+    pub async fn get_metric_k8s_deployment_raw_efficiency(
+        &self,
+        name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployment_raw_efficiency(name, q).await
+    }
 
-        fn get_metric_k8s_deployment_cost(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_cost;
-        fn get_metric_k8s_deployment_cost_summary(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_cost_summary;
-        fn get_metric_k8s_deployment_cost_trend(name: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_deployment_cost_trend;
+    pub async fn get_metric_k8s_deployments_cost(
+        &self,
+        q: RangeQuery,
+        deployments: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployments_cost(q, deployments).await
+    }
+    pub async fn get_metric_k8s_deployments_cost_summary(
+        &self,
+        q: RangeQuery,
+        deployments: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployments_cost_summary(q, deployments).await
+    }
+    pub async fn get_metric_k8s_deployments_cost_trend(
+        &self,
+        q: RangeQuery,
+        deployments: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployments_cost_trend(q, deployments).await
+    }
 
-        fn get_metric_k8s_containers_raw(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_raw;
-        fn get_metric_k8s_containers_raw_summary(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_raw_summary;
-        fn get_metric_k8s_containers_raw_efficiency(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_raw_efficiency;
+    pub async fn get_metric_k8s_deployment_cost(
+        &self,
+        name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployment_cost(name, q).await
+    }
+    pub async fn get_metric_k8s_deployment_cost_summary(
+        &self,
+        name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployment_cost_summary(name, q).await
+    }
+    pub async fn get_metric_k8s_deployment_cost_trend(
+        &self,
+        name: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_deployment_cost_trend(name, q).await
+    }
 
-        fn get_metric_k8s_container_raw(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_raw;
-        fn get_metric_k8s_container_raw_summary(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_raw_summary;
-        fn get_metric_k8s_container_raw_efficiency(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_raw_efficiency;
+    pub async fn get_metric_k8s_containers_raw(
+        &self,
+        q: RangeQuery,
+        container_keys: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_containers_raw(q, container_keys).await
+    }
+    pub async fn get_metric_k8s_containers_raw_summary(
+        &self,
+        q: RangeQuery,
+        container_keys: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_containers_raw_summary(q, container_keys).await
+    }
+    pub async fn get_metric_k8s_containers_raw_efficiency(
+        &self,
+        q: RangeQuery,
+        container_keys: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_containers_raw_efficiency(q, container_keys).await
+    }
 
-        fn get_metric_k8s_containers_cost(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_cost;
-        fn get_metric_k8s_containers_cost_summary(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_cost_summary;
-        fn get_metric_k8s_containers_cost_trend(q: RangeQuery, container_keys: Vec<String>) -> serde_json::Value => get_metric_k8s_containers_cost_trend;
+    pub async fn get_metric_k8s_container_raw(
+        &self,
+        id: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_container_raw(id, q).await
+    }
+    pub async fn get_metric_k8s_container_raw_summary(
+        &self,
+        id: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_container_raw_summary(id, q).await
+    }
+    pub async fn get_metric_k8s_container_raw_efficiency(
+        &self,
+        id: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_container_raw_efficiency(id, q).await
+    }
 
-        fn get_metric_k8s_container_cost(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_cost;
-        fn get_metric_k8s_container_cost_summary(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_cost_summary;
-        fn get_metric_k8s_container_cost_trend(id: String, q: RangeQuery) -> serde_json::Value => get_metric_k8s_container_cost_trend;
+    pub async fn get_metric_k8s_containers_cost(
+        &self,
+        q: RangeQuery,
+        container_keys: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_containers_cost(q, container_keys).await
+    }
+    pub async fn get_metric_k8s_containers_cost_summary(
+        &self,
+        q: RangeQuery,
+        container_keys: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_containers_cost_summary(q, container_keys).await
+    }
+    pub async fn get_metric_k8s_containers_cost_trend(
+        &self,
+        q: RangeQuery,
+        container_keys: Vec<String>,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_containers_cost_trend(q, container_keys).await
+    }
+
+    pub async fn get_metric_k8s_container_cost(
+        &self,
+        id: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_container_cost(id, q).await
+    }
+    pub async fn get_metric_k8s_container_cost_summary(
+        &self,
+        id: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_container_cost_summary(id, q).await
+    }
+    pub async fn get_metric_k8s_container_cost_trend(
+        &self,
+        id: String,
+        q: RangeQuery,
+    ) -> anyhow::Result<serde_json::Value> {
+        get_metric_k8s_container_cost_trend(id, q).await
     }
 }
 
@@ -436,7 +976,7 @@ impl MetricService {
     pub async fn get_metric_k8s_cluster_raw(
         &self,
         q: RangeQuery,
-        node_names: Vec<String>
+        node_names: Vec<String>,
     ) -> anyhow::Result<serde_json::Value> {
         get_metric_k8s_cluster_raw(node_names, q).await
     }
@@ -444,7 +984,7 @@ impl MetricService {
     pub async fn get_metric_k8s_cluster_raw_summary(
         &self,
         q: RangeQuery,
-        node_names: Vec<String>
+        node_names: Vec<String>,
     ) -> anyhow::Result<serde_json::Value> {
         get_metric_k8s_cluster_raw_summary(node_names, q).await
     }
@@ -452,7 +992,7 @@ impl MetricService {
     pub async fn get_metric_k8s_cluster_raw_efficiency(
         &self,
         q: RangeQuery,
-        node_names: Vec<String>
+        node_names: Vec<String>,
     ) -> anyhow::Result<serde_json::Value> {
         let nodes = list_k8s_nodes(K8sListNodeQuery::default()).await?;
         get_metric_k8s_cluster_raw_efficiency(nodes, node_names, q).await

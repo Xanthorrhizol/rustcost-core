@@ -1,12 +1,12 @@
 use super::info_setting_entity::{InfoSettingEntity, RuntimeType};
 use crate::core::persistence::info::fixed::info_fixed_fs_adapter_trait::InfoFixedFsAdapterTrait;
+use crate::core::persistence::storage_path::info_setting_path;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use std::{
     fs::{self, File},
     io::{BufRead, BufReader},
 };
-use crate::core::persistence::storage_path::info_setting_path;
 
 /// File-based FS_ADAPTER implementation for the `Settings` entity.
 ///
@@ -16,8 +16,7 @@ use crate::core::persistence::storage_path::info_setting_path;
 pub struct InfoSettingFsAdapter;
 
 impl InfoFixedFsAdapterTrait<InfoSettingEntity> for InfoSettingFsAdapter {
-
-     fn new() -> Self {
+    fn new() -> Self {
         Self {
             // Replace with your actual initialization details
             // Example: base_path or config location
@@ -48,24 +47,57 @@ impl InfoFixedFsAdapterTrait<InfoSettingEntity> for InfoSettingFsAdapter {
                     "IS_DARK_MODE" => s.is_dark_mode = val.eq_ignore_ascii_case("true"),
                     "LANGUAGE" => s.language = val.to_string(),
 
-                    "MINUTE_RETENTION_DAY" => s.minute_retention_days = val.parse().unwrap_or(s.minute_retention_days),
-                    "HOUR_RETENTION_MONTH" => s.hour_retention_months = val.parse().unwrap_or(s.hour_retention_months),
-                    "DAY_RETENTION_YEAR" => s.day_retention_years = val.parse().unwrap_or(s.day_retention_years),                    "RETENTION_POLICY" => s.retention_policy = val.to_string(),
+                    "MINUTE_RETENTION_DAY" => {
+                        s.minute_retention_days = val.parse().unwrap_or(s.minute_retention_days)
+                    }
+                    "HOUR_RETENTION_MONTH" => {
+                        s.hour_retention_months = val.parse().unwrap_or(s.hour_retention_months)
+                    }
+                    "DAY_RETENTION_YEAR" => {
+                        s.day_retention_years = val.parse().unwrap_or(s.day_retention_years)
+                    }
+                    "RETENTION_POLICY" => s.retention_policy = val.to_string(),
 
                     // === TSDB Options ===
-                    "ENABLE_LINE_NUM_TRACKING" => s.enable_line_num_tracking = val.eq_ignore_ascii_case("true"),
+                    "ENABLE_LINE_NUM_TRACKING" => {
+                        s.enable_line_num_tracking = val.eq_ignore_ascii_case("true")
+                    }
                     "ENABLE_INDEX_FILE" => s.enable_index_file = val.eq_ignore_ascii_case("true"),
                     "MAX_STORAGE_GB" => s.max_storage_gb = val.parse().unwrap_or(s.max_storage_gb),
-                    "COMPRESSION_ENABLED" => s.compression_enabled = val.eq_ignore_ascii_case("true"),
+                    "COMPRESSION_ENABLED" => {
+                        s.compression_enabled = val.eq_ignore_ascii_case("true")
+                    }
 
                     // === Metrics ===
-                    "SCRAPE_INTERVAL_SEC" => s.scrape_interval_sec = val.parse().unwrap_or(s.scrape_interval_sec),
-                    "METRICS_BATCH_SIZE" => s.metrics_batch_size = val.parse().unwrap_or(s.metrics_batch_size),
+                    "SCRAPE_INTERVAL_SEC" => {
+                        s.scrape_interval_sec = val.parse().unwrap_or(s.scrape_interval_sec)
+                    }
+                    "METRICS_BATCH_SIZE" => {
+                        s.metrics_batch_size = val.parse().unwrap_or(s.metrics_batch_size)
+                    }
 
                     // === LLM ===
-                    "LLM_URL" => s.llm_url = if val.is_empty() { None } else { Some(val.to_string()) },
-                    "LLM_TOKEN" => s.llm_token = if val.is_empty() { None } else { Some(val.to_string()) },
-                    "LLM_MODEL" => s.llm_model = if val.is_empty() { None } else { Some(val.to_string()) },
+                    "LLM_URL" => {
+                        s.llm_url = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
+                    "LLM_TOKEN" => {
+                        s.llm_token = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
+                    "LLM_MODEL" => {
+                        s.llm_model = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
 
                     // === Metadata ===
                     "CREATED_AT" => {
@@ -80,37 +112,39 @@ impl InfoFixedFsAdapterTrait<InfoSettingEntity> for InfoSettingFsAdapter {
                     }
                     "VERSION" => s.version = val.to_string(),
 
-                        "RUNTIME_TYPE" => s.runtime_type = match val.to_lowercase().as_str() {
-                        "docker" => RuntimeType::Docker,
-                        "containerd" => RuntimeType::Containerd,
-                        "baremetal" => RuntimeType::BareMetal,
-                        _ => RuntimeType::K8s,
-                        },
-                        "ENABLE_K8S_API" => s.enable_k8s_api = val == "true",
-                        "ENABLE_CONTAINER_EXPORTER" => s.enable_container_exporter = val == "true",
-                        "ENABLE_GPU_EXPORTER" => s.enable_gpu_exporter = val == "true",
+                    "RUNTIME_TYPE" => {
+                        s.runtime_type = match val.to_lowercase().as_str() {
+                            "docker" => RuntimeType::Docker,
+                            "containerd" => RuntimeType::Containerd,
+                            "baremetal" => RuntimeType::BareMetal,
+                            _ => RuntimeType::K8s,
+                        }
+                    }
+                    "ENABLE_K8S_API" => s.enable_k8s_api = val == "true",
+                    "ENABLE_CONTAINER_EXPORTER" => s.enable_container_exporter = val == "true",
+                    "ENABLE_GPU_EXPORTER" => s.enable_gpu_exporter = val == "true",
 
-                        "GPU_EXPORTER_URLS" => {
+                    "GPU_EXPORTER_URLS" => {
                         s.gpu_exporter_urls = val
-                        .split(',')
-                        .map(|v| v.trim().to_string())
-                        .filter(|v| !v.is_empty())
-                        .collect();
-                        }
-                        "CONTAINER_EXPORTER_URLS" => {
+                            .split(',')
+                            .map(|v| v.trim().to_string())
+                            .filter(|v| !v.is_empty())
+                            .collect();
+                    }
+                    "CONTAINER_EXPORTER_URLS" => {
                         s.container_exporter_urls = val
-                        .split(',')
-                        .map(|v| v.trim().to_string())
-                        .filter(|v| !v.is_empty())
-                        .collect();
-                        }
-                        "K8S_API_URL" => {
+                            .split(',')
+                            .map(|v| v.trim().to_string())
+                            .filter(|v| !v.is_empty())
+                            .collect();
+                    }
+                    "K8S_API_URL" => {
                         s.k8s_api_url = if val.trim().is_empty() {
-                        None
+                            None
                         } else {
-                        Some(val.to_string())
+                            Some(val.to_string())
                         };
-                        }
+                    }
                     _ => {}
                 }
             }
@@ -140,8 +174,8 @@ impl InfoFixedFsAdapterTrait<InfoSettingEntity> for InfoSettingFsAdapter {
 impl InfoSettingFsAdapter {
     /// Internal helper to atomically write the settings file.
     fn write(&self, data: &InfoSettingEntity) -> Result<()> {
-        use std::io::Write;
         use std::fs::File;
+        use std::io::Write;
 
         let path = info_setting_path();
 
@@ -162,24 +196,44 @@ impl InfoSettingFsAdapter {
         writeln!(f, "HOUR_RETENTION_MONTH:{}", data.hour_retention_months)?;
         writeln!(f, "DAY_RETENTION_YEAR:{}", data.day_retention_years)?;
         writeln!(f, "RETENTION_POLICY:{}", data.retention_policy)?;
-        writeln!(f, "ENABLE_LINE_NUM_TRACKING:{}", data.enable_line_num_tracking)?;
+        writeln!(
+            f,
+            "ENABLE_LINE_NUM_TRACKING:{}",
+            data.enable_line_num_tracking
+        )?;
         writeln!(f, "ENABLE_INDEX_FILE:{}", data.enable_index_file)?;
         writeln!(f, "MAX_STORAGE_GB:{}", data.max_storage_gb)?;
         writeln!(f, "COMPRESSION_ENABLED:{}", data.compression_enabled)?;
         writeln!(f, "SCRAPE_INTERVAL_SEC:{}", data.scrape_interval_sec)?;
         writeln!(f, "METRICS_BATCH_SIZE:{}", data.metrics_batch_size)?;
         writeln!(f, "LLM_URL:{}", data.llm_url.clone().unwrap_or_default())?;
-        writeln!(f, "LLM_TOKEN:{}", data.llm_token.clone().unwrap_or_default())?;
-        writeln!(f, "LLM_MODEL:{}", data.llm_model.clone().unwrap_or_default())?;
+        writeln!(
+            f,
+            "LLM_TOKEN:{}",
+            data.llm_token.clone().unwrap_or_default()
+        )?;
+        writeln!(
+            f,
+            "LLM_MODEL:{}",
+            data.llm_model.clone().unwrap_or_default()
+        )?;
         writeln!(f, "CREATED_AT:{}", data.created_at.to_rfc3339())?;
         writeln!(f, "UPDATED_AT:{}", data.updated_at.to_rfc3339())?;
         writeln!(f, "VERSION:{}", data.version)?;
         writeln!(f, "RUNTIME_TYPE:{:?}", data.runtime_type)?;
         writeln!(f, "ENABLE_K8S_API:{}", data.enable_k8s_api)?;
-        writeln!(f, "ENABLE_CONTAINER_EXPORTER:{}", data.enable_container_exporter)?;
+        writeln!(
+            f,
+            "ENABLE_CONTAINER_EXPORTER:{}",
+            data.enable_container_exporter
+        )?;
         writeln!(f, "ENABLE_GPU_EXPORTER:{}", data.enable_gpu_exporter)?;
         writeln!(f, "GPU_EXPORTER_URLS:{}", data.gpu_exporter_urls.join(", "))?;
-        writeln!(f, "CONTAINER_EXPORTER_URLS:{}", data.container_exporter_urls.join(", "))?;
+        writeln!(
+            f,
+            "CONTAINER_EXPORTER_URLS:{}",
+            data.container_exporter_urls.join(", ")
+        )?;
         writeln!(
             f,
             "K8S_API_URL:{}",
@@ -196,7 +250,6 @@ impl InfoSettingFsAdapter {
         // On Unix, also fsync the directory so the rename is durable
         #[cfg(unix)]
         if let Some(dir) = path.parent() {
-            use std::os::unix::fs::FileExt as _;
             let dir_file = File::open(dir).context("Failed to open settings directory")?;
             dir_file
                 .sync_all()

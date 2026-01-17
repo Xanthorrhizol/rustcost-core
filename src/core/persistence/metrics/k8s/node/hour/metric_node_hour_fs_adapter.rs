@@ -1,20 +1,19 @@
-use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
-use anyhow::{anyhow, Error, Result};
-use chrono::{DateTime, NaiveDate, Datelike, Utc};
+use crate::core::persistence::metrics::k8s::node::minute::metric_node_minute_fs_adapter::MetricNodeMinuteFsAdapter;
+use crate::core::persistence::metrics::k8s::path::{
+    metric_k8s_node_key_hour_dir_path, metric_k8s_node_key_hour_file_path,
+};
+use crate::core::persistence::metrics::metric_fs_adapter_base_trait::MetricFsAdapterBase;
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use std::io::BufWriter;
+use std::path::PathBuf;
 use std::{
     fs::File,
     fs::{self, OpenOptions},
     io::Write,
     io::{BufRead, BufReader},
     path::Path,
-};
-use std::path::PathBuf;
-use crate::core::persistence::metrics::k8s::node::minute::metric_node_minute_fs_adapter::MetricNodeMinuteFsAdapter;
-use crate::core::persistence::metrics::k8s::path::{
-    metric_k8s_node_key_hour_dir_path,
-    metric_k8s_node_key_hour_file_path,
 };
 
 /// Adapter for node minute-level metrics.
@@ -23,7 +22,6 @@ use crate::core::persistence::metrics::k8s::path::{
 pub struct MetricNodeHourFsAdapter;
 
 impl MetricNodeHourFsAdapter {
-
     fn delete_batch(batch: &[PathBuf]) -> Result<()> {
         for path in batch {
             match fs::remove_file(path) {
@@ -33,7 +31,6 @@ impl MetricNodeHourFsAdapter {
         }
         Ok(())
     }
-
 
     fn parse_year_month(stem: &str) -> Option<NaiveDate> {
         let mut parts = stem.split('-');
@@ -88,7 +85,6 @@ impl MetricNodeHourFsAdapter {
     //     Ok(())
     // }
 
-
     fn opt(v: Option<u64>) -> String {
         v.map(|x| x.to_string()).unwrap_or_default()
     }
@@ -105,10 +101,7 @@ impl MetricNodeHourFsAdapter {
     /// 6. Produce file names in the format `YYYY-MM.rcd`
     ///
     /// Returns an error if the date range exceeds 10 years.
-    fn monthly_file_names(
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-    ) -> Result<Vec<String>, String> {
+    fn monthly_file_names(start: DateTime<Utc>, end: DateTime<Utc>) -> Result<Vec<String>, String> {
         let start_date = start.date_naive();
         let end_date = end.date_naive();
 
@@ -121,37 +114,30 @@ impl MetricNodeHourFsAdapter {
         let start_month =
             NaiveDate::from_ymd_opt(start_date.year(), start_date.month(), 1).unwrap();
 
-        let end_month =
-            NaiveDate::from_ymd_opt(end_date.year(), end_date.month(), 1).unwrap();
+        let end_month = NaiveDate::from_ymd_opt(end_date.year(), end_date.month(), 1).unwrap();
 
         // Total number of months between start and end (inclusive)
-        let total_months =
-            (end_month.year() - start_month.year()) * 12
-                + (end_month.month() as i32 - start_month.month() as i32)
-                + 1;
+        let total_months = (end_month.year() - start_month.year()) * 12
+            + (end_month.month() as i32 - start_month.month() as i32)
+            + 1;
 
         // Generate file names using a deterministic for-loop
         let mut files = Vec::with_capacity(total_months as usize);
 
         for offset in 0..total_months {
-            let year = start_month.year()
-                + (start_month.month() as i32 - 1 + offset) / 12;
+            let year = start_month.year() + (start_month.month() as i32 - 1 + offset) / 12;
 
-            let month =
-                (start_month.month() as i32 - 1 + offset) % 12 + 1;
+            let month = (start_month.month() as i32 - 1 + offset) % 12 + 1;
 
             files.push(format!("{year:04}-{month:02}.rcd"));
         }
 
         Ok(files)
     }
-
-
 }
 
 impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
     fn append_row(&self, node: &str, dto: &MetricNodeEntity, now: DateTime<Utc>) -> Result<()> {
-
         let now_date = now.date_naive();
         let path_str = self.build_path(node, now_date);
         let path = Path::new(&path_str);
@@ -163,10 +149,7 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
         // let new = !path.exists();
 
         // ✅ open file and wrap in BufWriter
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
         let mut writer = BufWriter::new(file);
 
         // Write header if file newly created
@@ -194,7 +177,6 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
             Self::opt(dto.fs_inodes),
         );
 
-
         // ✅ write to buffer
         writer.write_all(row.as_bytes())?;
 
@@ -209,7 +191,7 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
         node_uid: &str,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-        now: DateTime<Utc>
+        now: DateTime<Utc>,
     ) -> Result<()> {
         // --- 1️⃣ Load minute data
         let minute_adapter = MetricNodeMinuteFsAdapter;
@@ -224,8 +206,10 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
         let last = rows.last().unwrap();
 
         let avg = |f: fn(&MetricNodeEntity) -> Option<u64>| -> Option<u64> {
-            let (sum, count): (u64, u64) =
-                rows.iter().filter_map(f).fold((0, 0), |(s, c), v| (s + v, c + 1));
+            let (sum, count): (u64, u64) = rows
+                .iter()
+                .filter_map(f)
+                .fold((0, 0), |(s, c), v| (s + v, c + 1));
             if count > 0 {
                 Some(sum / count)
             } else {
@@ -281,8 +265,14 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
         }
 
         // Normalize cutoff month (YYYY-MM-01)
-        let before_month = NaiveDate::from_ymd_opt(before.year(), before.month(), 1)
-            .ok_or_else(|| anyhow!("invalid 'before' month ({})-({})", before.year(), before.month()))?;
+        let before_month =
+            NaiveDate::from_ymd_opt(before.year(), before.month(), 1).ok_or_else(|| {
+                anyhow!(
+                    "invalid 'before' month ({})-({})",
+                    before.year(),
+                    before.month()
+                )
+            })?;
 
         let mut batch = Vec::with_capacity(BATCH_SIZE);
 
@@ -338,25 +328,32 @@ impl MetricFsAdapterBase<MetricNodeEntity> for MetricNodeHourFsAdapter {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<Vec<MetricNodeEntity>> {
-
         let mut data: Vec<MetricNodeEntity> = vec![];
 
         // Calculate month iteration range
         let mut current_date = start.date_naive();
         let end_date = end.date_naive();
 
-
         let header: Vec<&str> = vec![
-            "TIME", "CPU_USAGE_NANO_CORES", "CPU_USAGE_CORE_NANO_SECONDS",
-            "MEMORY_USAGE_BYTES", "MEMORY_WORKING_SET_BYTES", "MEMORY_RSS_BYTES",
-            "MEMORY_PAGE_FAULTS", "NETWORK_PHYSICAL_RX_BYTES", "NETWORK_PHYSICAL_TX_BYTES",
-            "NETWORK_PHYSICAL_RX_ERRORS", "NETWORK_PHYSICAL_TX_ERRORS",
-            "FS_USED_BYTES", "FS_CAPACITY_BYTES", "FS_INODES_USED", "FS_INODES",
+            "TIME",
+            "CPU_USAGE_NANO_CORES",
+            "CPU_USAGE_CORE_NANO_SECONDS",
+            "MEMORY_USAGE_BYTES",
+            "MEMORY_WORKING_SET_BYTES",
+            "MEMORY_RSS_BYTES",
+            "MEMORY_PAGE_FAULTS",
+            "NETWORK_PHYSICAL_RX_BYTES",
+            "NETWORK_PHYSICAL_TX_BYTES",
+            "NETWORK_PHYSICAL_RX_ERRORS",
+            "NETWORK_PHYSICAL_TX_ERRORS",
+            "FS_USED_BYTES",
+            "FS_CAPACITY_BYTES",
+            "FS_INODES_USED",
+            "FS_INODES",
         ];
 
         let file_names =
-            MetricNodeHourFsAdapter::monthly_file_names(start, end)
-                .map_err(|e| anyhow!(e))?;
+            MetricNodeHourFsAdapter::monthly_file_names(start, end).map_err(|e| anyhow!(e))?;
 
         for file_name in file_names {
             let path = metric_k8s_node_key_hour_dir_path(object_name).join(file_name);

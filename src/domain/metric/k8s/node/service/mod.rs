@@ -12,10 +12,17 @@ use crate::core::persistence::metrics::k8s::node::hour::metric_node_hour_reposit
 use crate::core::persistence::metrics::k8s::node::metric_node_entity::MetricNodeEntity;
 use crate::core::persistence::metrics::k8s::node::minute::metric_node_minute_api_repository_trait::MetricNodeMinuteApiRepository;
 use crate::domain::common::service::day_granularity::split_day_granularity_rows;
-use crate::domain::info::service::{info_unit_price_service};
-use crate::domain::metric::k8s::common::dto::{CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricScope, MetricSeriesDto, NetworkMetricDto, UniversalMetricPointDto};
+use crate::domain::info::service::info_unit_price_service;
 use crate::domain::metric::k8s::common::dto::metric_k8s_raw_summary_dto::MetricRawSummaryResponseDto;
-use crate::domain::metric::k8s::common::service_helpers::{apply_node_costs, build_cost_summary_dto, build_cost_trend_dto, build_efficiency_value, build_node_cost_summary_dto, build_raw_summary_value, resolve_time_window, TimeWindow, BYTES_PER_GB};
+use crate::domain::metric::k8s::common::dto::{
+    CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricScope, MetricSeriesDto,
+    NetworkMetricDto, UniversalMetricPointDto,
+};
+use crate::domain::metric::k8s::common::service_helpers::{
+    apply_node_costs, build_cost_summary_dto, build_cost_trend_dto, build_efficiency_value,
+    build_node_cost_summary_dto, build_raw_summary_value, resolve_time_window, TimeWindow,
+    BYTES_PER_GB,
+};
 use crate::domain::metric::k8s::common::util::k8s_metric_repository_resolve::resolve_k8s_metric_repository;
 use crate::domain::metric::k8s::common::util::k8s_metric_repository_variant::K8sMetricRepositoryVariant;
 
@@ -24,7 +31,6 @@ fn fetch_node_points(
     node_name: &str,
     window: &TimeWindow,
 ) -> Result<(Vec<UniversalMetricPointDto>, f64)> {
-
     match repo {
         // --------------------
         // Minute
@@ -33,10 +39,7 @@ fn fetch_node_points(
             let rows = r.get_row_between(node_name, window.start, window.end)?;
             let running_hours = rows.len() as f64 / 60.0;
 
-            let points = rows
-                .into_iter()
-                .map(metric_node_entity_to_point)
-                .collect();
+            let points = rows.into_iter().map(metric_node_entity_to_point).collect();
 
             Ok((points, running_hours))
         }
@@ -48,10 +51,7 @@ fn fetch_node_points(
             let rows = r.get_row_between(node_name, window.start, window.end)?;
             let running_hours = rows.len() as f64;
 
-            let points = rows
-                .into_iter()
-                .map(metric_node_entity_to_point)
-                .collect();
+            let points = rows.into_iter().map(metric_node_entity_to_point).collect();
 
             Ok((points, running_hours))
         }
@@ -63,27 +63,18 @@ fn fetch_node_points(
             let day_repo = MetricNodeDayRepository::new();
             let hour_repo = MetricNodeHourRepository::new();
 
-            let split = split_day_granularity_rows(
-                node_name,
-                window,
-                &day_repo,
-                &hour_repo,
-            )?;
+            let split = split_day_granularity_rows(node_name, window, &day_repo, &hour_repo)?;
 
-            let running_hours =
-                split.start_hour_rows.len() as f64 +
-                    split.end_hour_rows.len() as f64 +
-                    split.middle_day_rows.len() as f64 * 24.0;
+            let running_hours = split.start_hour_rows.len() as f64
+                + split.end_hour_rows.len() as f64
+                + split.middle_day_rows.len() as f64 * 24.0;
 
             let mut rows = Vec::new();
             rows.extend(split.start_hour_rows);
             rows.extend(split.middle_day_rows);
             rows.extend(split.end_hour_rows);
 
-            let points = rows
-                .into_iter()
-                .map(metric_node_entity_to_point)
-                .collect();
+            let points = rows.into_iter().map(metric_node_entity_to_point).collect();
 
             Ok((points, running_hours))
         }
@@ -123,7 +114,6 @@ async fn build_node_raw_data(
     q: RangeQuery,
     node_names: Vec<String>,
 ) -> Result<(MetricGetResponseDto, Vec<InfoNodeEntity>)> {
-
     // 1️⃣ Resolve metric window + repository
     let window = resolve_time_window(&q);
     let metric_repo = resolve_k8s_metric_repository(&MetricScope::Node, &window.granularity);
@@ -140,7 +130,8 @@ async fn build_node_raw_data(
 
     // 3️⃣ Apply filters
     let matches = |value: &Option<String>, filter: &str| {
-        value.as_deref()
+        value
+            .as_deref()
             .map(|v| v.split(',').any(|x| x.trim().eq_ignore_ascii_case(filter)))
             .unwrap_or(false)
     };
@@ -158,7 +149,9 @@ async fn build_node_raw_data(
     // 4️⃣ Sorting
     match q.sort.as_deref() {
         Some("cpu") => node_infos.sort_by(|a, b| a.cpu_capacity_cores.cmp(&b.cpu_capacity_cores)),
-        Some("memory") => node_infos.sort_by(|a, b| a.memory_capacity_bytes.cmp(&b.memory_capacity_bytes)),
+        Some("memory") => {
+            node_infos.sort_by(|a, b| a.memory_capacity_bytes.cmp(&b.memory_capacity_bytes))
+        }
         Some("ready") => node_infos.sort_by(|a, b| a.ready.cmp(&b.ready)),
         Some("ip") => node_infos.sort_by(|a, b| a.internal_ip.cmp(&b.internal_ip)),
         _ => node_infos.sort_by(|a, b| a.node_name.cmp(&b.node_name)),
@@ -229,18 +222,23 @@ fn sum_node_allocations(nodes: &[InfoNodeEntity]) -> (f64, f64, f64) {
     )
 }
 
-
 pub async fn get_metric_k8s_nodes_raw(q: RangeQuery, node_names: Vec<String>) -> Result<Value> {
     let (response, _) = build_node_raw_data(q, node_names).await?;
     Ok(serde_json::to_value(response)?)
 }
 
-pub async fn get_metric_k8s_nodes_raw_summary(q: RangeQuery, node_names: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_nodes_raw_summary(
+    q: RangeQuery,
+    node_names: Vec<String>,
+) -> Result<Value> {
     let (response, node_infos) = build_node_raw_data(q, node_names).await?;
     build_raw_summary_value(&response, MetricScope::Node, node_infos.len())
 }
 
-pub async fn get_metric_k8s_nodes_raw_efficiency(q: RangeQuery, node_names: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_nodes_raw_efficiency(
+    q: RangeQuery,
+    node_names: Vec<String>,
+) -> Result<Value> {
     let (summary_value, node_infos) = {
         let (response, infos) = build_node_raw_data(q.clone(), node_names).await?;
         let summary_json = build_raw_summary_value(&response, MetricScope::Node, infos.len())?;
@@ -249,7 +247,13 @@ pub async fn get_metric_k8s_nodes_raw_efficiency(q: RangeQuery, node_names: Vec<
 
     let summary: MetricRawSummaryResponseDto = serde_json::from_value(summary_value)?;
     let (total_cpu, total_mem, total_storage) = sum_node_allocations(&node_infos);
-    build_efficiency_value(summary, MetricScope::Node, total_cpu, total_mem, total_storage)
+    build_efficiency_value(
+        summary,
+        MetricScope::Node,
+        total_cpu,
+        total_mem,
+        total_storage,
+    )
 }
 
 pub async fn get_metric_k8s_node_raw(node_name: String, q: RangeQuery) -> Result<Value> {
@@ -270,7 +274,13 @@ pub async fn get_metric_k8s_node_raw_efficiency(node_name: String, q: RangeQuery
     let summary_value = build_raw_summary_value(&response, MetricScope::Node, 1)?;
     let summary: MetricRawSummaryResponseDto = serde_json::from_value(summary_value)?;
     let (total_cpu, total_mem, total_storage) = sum_node_allocations(&node_infos);
-    build_efficiency_value(summary, MetricScope::Node, total_cpu, total_mem, total_storage)
+    build_efficiency_value(
+        summary,
+        MetricScope::Node,
+        total_cpu,
+        total_mem,
+        total_storage,
+    )
 }
 
 async fn build_node_cost_response(
@@ -284,6 +294,7 @@ async fn build_node_cost_response(
     Ok(response)
 }
 
+#[allow(dead_code)]
 async fn build_node_cost_response_v2(
     q: RangeQuery,
     node_names: Vec<String>,
@@ -301,21 +312,31 @@ pub async fn get_metric_k8s_nodes_cost(q: RangeQuery, node_names: Vec<String>) -
     Ok(serde_json::to_value(response)?)
 }
 
-pub async fn get_metric_k8s_nodes_cost_summary(q: RangeQuery, node_names: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_nodes_cost_summary(
+    q: RangeQuery,
+    node_names: Vec<String>,
+) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
     let response = build_node_cost_response(q, node_names, unit_prices.clone()).await?;
     let dto = build_node_cost_summary_dto(&response, MetricScope::Node, None, &unit_prices);
     Ok(serde_json::to_value(dto)?)
 }
 
-pub async fn get_metric_k8s_nodes_cost_summary_v2(q: RangeQuery, node_names: Vec<String>) -> Result<Value> {
+#[allow(dead_code)]
+pub async fn get_metric_k8s_nodes_cost_summary_v2(
+    q: RangeQuery,
+    node_names: Vec<String>,
+) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
     let response = build_node_cost_response(q, node_names, unit_prices.clone()).await?;
     let dto = build_cost_summary_dto(&response, MetricScope::Node, None, &unit_prices);
     Ok(serde_json::to_value(dto)?)
 }
 
-pub async fn get_metric_k8s_nodes_cost_trend(q: RangeQuery, node_names: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_nodes_cost_trend(
+    q: RangeQuery,
+    node_names: Vec<String>,
+) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
     let response = build_node_cost_response(q, node_names, unit_prices).await?;
     let dto = build_cost_trend_dto(&response, MetricScope::Node, None)?;

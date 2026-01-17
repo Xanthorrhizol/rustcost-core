@@ -18,7 +18,10 @@ use super::llm_provider::LlmProvider;
 pub struct InfoLlmFsAdapter;
 
 impl InfoFixedFsAdapterTrait<InfoLlmEntity> for InfoLlmFsAdapter {
-    fn new() -> Self where Self: Sized {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
         Self {}
     }
 
@@ -44,9 +47,27 @@ impl InfoFixedFsAdapterTrait<InfoLlmEntity> for InfoLlmFsAdapter {
                             s.provider = p;
                         }
                     }
-                    "BASE_URL" => s.base_url = if val.is_empty() { None } else { Some(val.to_string()) },
-                    "TOKEN" => s.token = if val.is_empty() { None } else { Some(val.to_string()) },
-                    "MODEL" => s.model = if val.is_empty() { None } else { Some(val.to_string()) },
+                    "BASE_URL" => {
+                        s.base_url = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
+                    "TOKEN" => {
+                        s.token = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
+                    "MODEL" => {
+                        s.model = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
                     "MAX_OUTPUT_TOKENS" => {
                         s.max_output_tokens = val.parse().ok();
                     }
@@ -65,8 +86,20 @@ impl InfoFixedFsAdapterTrait<InfoLlmEntity> for InfoLlmFsAdapter {
                             .collect();
                         s.stop_sequences = if seq.is_empty() { None } else { Some(seq) };
                     }
-                    "ORGANIZATION" => s.organization = if val.is_empty() { None } else { Some(val.to_string()) },
-                    "USER" => s.user = if val.is_empty() { None } else { Some(val.to_string()) },
+                    "ORGANIZATION" => {
+                        s.organization = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
+                    "USER" => {
+                        s.user = if val.is_empty() {
+                            None
+                        } else {
+                            Some(val.to_string())
+                        }
+                    }
                     "CREATED_AT" => {
                         if let Ok(dt) = val.parse::<DateTime<Utc>>() {
                             s.created_at = dt;
@@ -147,7 +180,11 @@ impl InfoLlmFsAdapter {
             .map(|v| v.join(","))
             .unwrap_or_default();
         writeln!(f, "STOP_SEQUENCES:{}", stops)?;
-        writeln!(f, "ORGANIZATION:{}", data.organization.clone().unwrap_or_default())?;
+        writeln!(
+            f,
+            "ORGANIZATION:{}",
+            data.organization.clone().unwrap_or_default()
+        )?;
         writeln!(f, "USER:{}", data.user.clone().unwrap_or_default())?;
         writeln!(f, "CREATED_AT:{}", data.created_at.to_rfc3339())?;
         writeln!(f, "UPDATED_AT:{}", data.updated_at.to_rfc3339())?;
@@ -159,9 +196,10 @@ impl InfoLlmFsAdapter {
 
         #[cfg(unix)]
         if let Some(dir) = path.parent() {
-            use std::os::unix::fs::FileExt as _;
             let dir_file = File::open(dir).context("Failed to open llm directory")?;
-            dir_file.sync_all().context("Failed to sync llm directory")?;
+            dir_file
+                .sync_all()
+                .context("Failed to sync llm directory")?;
         }
 
         Ok(())

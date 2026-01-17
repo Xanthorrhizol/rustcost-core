@@ -5,7 +5,6 @@ use validator::Validate;
 use crate::core::persistence::info::fixed::alerts::info_alert_api_repository_trait::InfoAlertApiRepository;
 use crate::core::persistence::info::fixed::alerts::info_alert_entity::InfoAlertEntity;
 use crate::core::persistence::info::fixed::alerts::info_alert_repository::InfoAlertRepository;
-use crate::core::persistence::info::fixed::info_fixed_fs_adapter_trait::InfoFixedFsAdapterTrait;
 use crate::domain::info::dto::info_alert_upsert_request::InfoAlertUpsertRequest;
 
 pub async fn get_info_alerts() -> Result<InfoAlertEntity> {
@@ -19,9 +18,7 @@ pub async fn upsert_info_alerts(req: InfoAlertUpsertRequest) -> Result<Value> {
     upsert_info_alerts_with_repo(&repo, req).await
 }
 
-async fn get_info_alerts_with_repo<R: InfoAlertApiRepository>(
-    repo: &R,
-) -> Result<InfoAlertEntity> {
+async fn get_info_alerts_with_repo<R: InfoAlertApiRepository>(repo: &R) -> Result<InfoAlertEntity> {
     repo.read()
 }
 
@@ -52,7 +49,10 @@ mod tests {
     }
 
     impl InfoFixedFsAdapterTrait<InfoAlertEntity> for MockInfoAlertAdapter {
-        fn new() -> Self where Self: Sized {
+        fn new() -> Self
+        where
+            Self: Sized,
+        {
             Self::default()
         }
 

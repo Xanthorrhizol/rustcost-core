@@ -5,10 +5,6 @@ use crate::api::dto::paginated_response::PaginatedResponse;
 use crate::core::client::k8s::client_k8s_persistent_volume;
 use crate::core::client::k8s::util::{build_client, read_token};
 
-pub async fn get_k8s_persistent_volumes() -> Result<PaginatedResponse<PersistentVolume>> {
-    get_k8s_persistent_volumes_paginated(None, None).await
-}
-
 pub async fn get_k8s_persistent_volumes_paginated(
     limit: Option<usize>,
     offset: Option<usize>,
@@ -45,4 +41,3 @@ pub async fn get_k8s_persistent_volume(name: String) -> Result<PersistentVolume>
 
     client_k8s_persistent_volume::fetch_persistent_volume_by_name(&token, &client, &name).await
 }
-

@@ -1,6 +1,3 @@
-use anyhow::{anyhow, Result};
-use serde_json::Value;
-use std::collections::HashSet;
 use crate::api::dto::{info_dto::K8sListQuery, metrics_dto::RangeQuery};
 use crate::core::persistence::info::fixed::unit_price::info_unit_price_entity::InfoUnitPriceEntity;
 use crate::core::persistence::info::k8s::container::info_container_entity::InfoContainerEntity;
@@ -8,24 +5,25 @@ use crate::core::persistence::info::k8s::pod::info_pod_api_repository_trait::Inf
 use crate::core::persistence::info::k8s::pod::info_pod_entity::InfoPodEntity;
 use crate::core::persistence::info::k8s::pod::info_pod_repository::InfoPodRepository;
 use crate::core::persistence::metrics::k8s::pod::day::metric_pod_day_repository::MetricPodDayRepository;
-use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_repository::MetricPodHourRepository;
 use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_api_repository_trait::MetricPodHourApiRepository;
+use crate::core::persistence::metrics::k8s::pod::hour::metric_pod_hour_repository::MetricPodHourRepository;
 use crate::core::persistence::metrics::k8s::pod::metric_pod_entity::MetricPodEntity;
-use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_repository::MetricPodMinuteRepository;
 use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_api_repository_trait::MetricPodMinuteApiRepository;
-use crate::domain::info::service::{
-    info_k8s_container_service, info_unit_price_service,
-};
-use crate::domain::metric::k8s::common::dto::{
-    CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricScope, MetricSeriesDto,
-    NetworkMetricDto, StorageMetricDto, UniversalMetricPointDto, MetricGranularity,
-};
+use crate::core::persistence::metrics::k8s::pod::minute::metric_pod_minute_repository::MetricPodMinuteRepository;
+use crate::domain::common::service::day_granularity::split_day_granularity_rows;
+use crate::domain::info::service::{info_k8s_container_service, info_unit_price_service};
 use crate::domain::metric::k8s::common::dto::metric_k8s_raw_summary_dto::MetricRawSummaryResponseDto;
+use crate::domain::metric::k8s::common::dto::{
+    CommonMetricValuesDto, FilesystemMetricDto, MetricGetResponseDto, MetricGranularity,
+    MetricScope, MetricSeriesDto, NetworkMetricDto, StorageMetricDto, UniversalMetricPointDto,
+};
 use crate::domain::metric::k8s::common::service_helpers::{
     apply_costs, build_cost_summary_dto, build_cost_trend_dto, build_efficiency_value,
     build_raw_summary_value, resolve_time_window, TimeWindow, BYTES_PER_GB,
 };
-use crate::domain::common::service::day_granularity::{split_day_granularity_rows};
+use anyhow::{anyhow, Result};
+use serde_json::Value;
+use std::collections::HashSet;
 
 fn fetch_pod_points(
     pod_uid: &str,
@@ -37,10 +35,8 @@ fn fetch_pod_points(
     let rows: Vec<MetricPodEntity> = match window.granularity {
         MetricGranularity::Day => {
             let split_rows = split_day_granularity_rows(
-                pod_uid,   // object_name 역할 = pod_uid
-                window,
-                day_repo,
-                hour_repo,
+                pod_uid, // object_name 역할 = pod_uid
+                window, day_repo, hour_repo,
             )?;
 
             let mut merged = Vec::new();
@@ -60,8 +56,6 @@ fn fetch_pod_points(
         MetricGranularity::Minute => {
             minute_repo.get_row_between(window.start, window.end, pod_uid, None, None)?
         }
-
-        _ => Vec::new(),
     };
 
     Ok(rows.into_iter().map(metric_pod_entity_to_point).collect())
@@ -111,7 +105,6 @@ async fn build_pod_raw_data(
     q: RangeQuery,
     pod_uids: Vec<String>,
 ) -> Result<(MetricGetResponseDto, Vec<InfoPodEntity>)> {
-
     let repo = InfoPodRepository::new();
     let mut pod_infos = Vec::new();
 
@@ -126,10 +119,7 @@ async fn build_pod_raw_data(
     let matches = |value: &Option<String>, filter: &str| {
         value
             .as_deref()
-            .map(|v| {
-                v.split(',')
-                    .any(|x| x.trim().eq_ignore_ascii_case(filter))
-            })
+            .map(|v| v.split(',').any(|x| x.trim().eq_ignore_ascii_case(filter)))
             .unwrap_or(false)
     };
 
@@ -168,10 +158,7 @@ fn build_pod_series_for_infos(
     let offset = q.offset.unwrap_or(0);
     let limit = q.limit.unwrap_or(pod_infos.len());
 
-    let sliced = pod_infos
-        .iter()
-        .skip(offset)
-        .take(limit);
+    let sliced = pod_infos.iter().skip(offset).take(limit);
 
     let mut series = Vec::new();
 
@@ -181,13 +168,7 @@ fn build_pod_series_for_infos(
             .clone()
             .ok_or_else(|| anyhow!("Pod record missing UID"))?;
 
-        let points = fetch_pod_points(
-            &pod_uid,
-            &window,
-            &day_repo,
-            &hour_repo,
-            &minute_repo,
-        )?;
+        let points = fetch_pod_points(&pod_uid, &window, &day_repo, &hour_repo, &minute_repo)?;
 
         let name = pod.pod_name.clone().unwrap_or_else(|| pod_uid.clone());
 
@@ -229,10 +210,7 @@ fn collect_pod_uids(pods: &[InfoPodEntity]) -> Vec<String> {
 }
 
 fn derive_namespace_hint(pods: &[InfoPodEntity]) -> Option<String> {
-    let namespaces: HashSet<_> = pods
-        .iter()
-        .filter_map(|p| p.namespace.clone())
-        .collect();
+    let namespaces: HashSet<_> = pods.iter().filter_map(|p| p.namespace.clone()).collect();
 
     if namespaces.len() == 1 {
         namespaces.into_iter().next()
@@ -252,7 +230,8 @@ fn sum_container_requests(
         if let Some(pod_uid) = &container.pod_uid {
             if target_pods.contains(pod_uid) {
                 total_cpu += container.cpu_request_millicores.unwrap_or(0) as f64 / 1000.0;
-                total_memory_gb += container.memory_request_bytes.unwrap_or(0) as f64 / BYTES_PER_GB;
+                total_memory_gb +=
+                    container.memory_request_bytes.unwrap_or(0) as f64 / BYTES_PER_GB;
             }
         }
     }
@@ -270,19 +249,23 @@ async fn build_pod_cost_response(
     Ok(response)
 }
 
-pub async fn get_metric_k8s_pods_raw(
-    q: RangeQuery,
-    pod_uids: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_pods_raw(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
     let (response, _) = build_pod_raw_data(q, pod_uids).await?;
     Ok(serde_json::to_value(response)?)
 }
 
-pub async fn get_metric_k8s_pods_raw_summary(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_pods_raw_summary(
+    q: RangeQuery,
+    pod_uids: Vec<String>,
+) -> Result<Value> {
     let (response, pod_infos) = build_pod_raw_data(q, pod_uids).await?;
     build_raw_summary_value(&response, MetricScope::Pod, pod_infos.len())
 }
 
-pub async fn get_metric_k8s_pods_raw_efficiency(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_pods_raw_efficiency(
+    q: RangeQuery,
+    pod_uids: Vec<String>,
+) -> Result<Value> {
     let (response, pod_infos) = build_pod_raw_data(q.clone(), pod_uids).await?;
     let summary_value = build_raw_summary_value(&response, MetricScope::Pod, pod_infos.len())?;
     let summary: MetricRawSummaryResponseDto = serde_json::from_value(summary_value)?;
@@ -363,7 +346,10 @@ pub async fn get_metric_k8s_pods_cost(q: RangeQuery, pod_uids: Vec<String>) -> R
     Ok(serde_json::to_value(response)?)
 }
 
-pub async fn get_metric_k8s_pods_cost_summary(q: RangeQuery, pod_uids: Vec<String>) -> Result<Value> {
+pub async fn get_metric_k8s_pods_cost_summary(
+    q: RangeQuery,
+    pod_uids: Vec<String>,
+) -> Result<Value> {
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
     let response = build_pod_cost_response(q, pod_uids, unit_prices.clone()).await?;
     let dto = build_cost_summary_dto(&response, MetricScope::Pod, None, &unit_prices);
@@ -387,8 +373,7 @@ pub async fn get_metric_k8s_pod_cost(pod_uid: String, q: RangeQuery) -> Result<V
 pub async fn get_metric_k8s_pod_cost_summary(pod_uid: String, q: RangeQuery) -> Result<Value> {
     let pod_uids = vec![pod_uid.clone()];
     let unit_prices = info_unit_price_service::get_info_unit_prices().await?;
-    let response =
-        build_pod_cost_response(q, pod_uids, unit_prices.clone()).await?;
+    let response = build_pod_cost_response(q, pod_uids, unit_prices.clone()).await?;
     let dto = build_cost_summary_dto(&response, MetricScope::Pod, Some(pod_uid), &unit_prices);
     Ok(serde_json::to_value(dto)?)
 }

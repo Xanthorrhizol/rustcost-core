@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct K8sPodQueryRequestDto {
     pub start: Option<NaiveDateTime>,
     pub end: Option<NaiveDateTime>,

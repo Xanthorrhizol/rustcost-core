@@ -35,6 +35,7 @@ where
     }
 
     /// Creates an error API response with a message and optional code
+    #[allow(dead_code)]
     pub fn err(msg: impl Into<String>) -> Self {
         Self {
             is_successful: false,

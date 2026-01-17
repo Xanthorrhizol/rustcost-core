@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::info::dto::info_alert_upsert_request::{AlertRuleUpsertRequest, InfoAlertUpsertRequest};
+use crate::domain::info::dto::info_alert_upsert_request::InfoAlertUpsertRequest;
 
 use super::alert_rule_entity::AlertRuleEntity;
 

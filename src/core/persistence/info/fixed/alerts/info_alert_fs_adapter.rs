@@ -155,7 +155,12 @@ impl InfoAlertFsAdapter {
         for (idx, rule) in data.rules.iter().enumerate() {
             writeln!(f, "ALERT_RULE_{}_ID:{}", idx, rule.id)?;
             writeln!(f, "ALERT_RULE_{}_NAME:{}", idx, rule.name)?;
-            writeln!(f, "ALERT_RULE_{}_METRIC:{}", idx, rule.metric_type.as_code())?;
+            writeln!(
+                f,
+                "ALERT_RULE_{}_METRIC:{}",
+                idx,
+                rule.metric_type.as_code()
+            )?;
             writeln!(f, "ALERT_RULE_{}_OPERATOR:{}", idx, rule.operator.as_code())?;
             writeln!(f, "ALERT_RULE_{}_THRESHOLD:{}", idx, rule.threshold)?;
             writeln!(f, "ALERT_RULE_{}_FOR_SEC:{}", idx, rule.for_duration_sec)?;
@@ -163,14 +168,38 @@ impl InfoAlertFsAdapter {
             writeln!(f, "ALERT_RULE_{}_ENABLED:{}", idx, rule.enabled)?;
         }
 
-        writeln!(f, "ENABLE_CLUSTER_HEALTH_ALERT:{}", data.enable_cluster_health_alert)?;
-        writeln!(f, "ENABLE_RUSTCOST_HEALTH_ALERT:{}", data.enable_rustcost_health_alert)?;
+        writeln!(
+            f,
+            "ENABLE_CLUSTER_HEALTH_ALERT:{}",
+            data.enable_cluster_health_alert
+        )?;
+        writeln!(
+            f,
+            "ENABLE_RUSTCOST_HEALTH_ALERT:{}",
+            data.enable_rustcost_health_alert
+        )?;
         writeln!(f, "GLOBAL_ALERT_SUBJECT:{}", data.global_alert_subject)?;
-        writeln!(f, "LINKBACK_URL:{}", data.linkback_url.clone().unwrap_or_default())?;
+        writeln!(
+            f,
+            "LINKBACK_URL:{}",
+            data.linkback_url.clone().unwrap_or_default()
+        )?;
         writeln!(f, "EMAIL_RECIPIENTS:{}", data.email_recipients.join(","))?;
-        writeln!(f, "SLACK_WEBHOOK_URL:{}", data.slack_webhook_url.clone().unwrap_or_default())?;
-        writeln!(f, "TEAMS_WEBHOOK_URL:{}", data.teams_webhook_url.clone().unwrap_or_default())?;
-        writeln!(f, "DISCORD_WEBHOOK_URL:{}", data.discord_webhook_url.clone().unwrap_or_default())?;
+        writeln!(
+            f,
+            "SLACK_WEBHOOK_URL:{}",
+            data.slack_webhook_url.clone().unwrap_or_default()
+        )?;
+        writeln!(
+            f,
+            "TEAMS_WEBHOOK_URL:{}",
+            data.teams_webhook_url.clone().unwrap_or_default()
+        )?;
+        writeln!(
+            f,
+            "DISCORD_WEBHOOK_URL:{}",
+            data.discord_webhook_url.clone().unwrap_or_default()
+        )?;
         writeln!(f, "CREATED_AT:{}", data.created_at.to_rfc3339())?;
         writeln!(f, "UPDATED_AT:{}", data.updated_at.to_rfc3339())?;
         writeln!(f, "VERSION:{}", data.version)?;
@@ -182,9 +211,10 @@ impl InfoAlertFsAdapter {
 
         #[cfg(unix)]
         if let Some(dir) = path.parent() {
-            use std::os::unix::fs::FileExt as _;
             let dir_file = File::open(dir).context("Failed to open alerts directory")?;
-            dir_file.sync_all().context("Failed to sync alerts directory")?;
+            dir_file
+                .sync_all()
+                .context("Failed to sync alerts directory")?;
         }
 
         Ok(())

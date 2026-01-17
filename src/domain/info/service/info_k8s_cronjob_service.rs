@@ -5,10 +5,6 @@ use crate::api::dto::paginated_response::PaginatedResponse;
 use crate::core::client::k8s::client_k8s_cronjob;
 use crate::core::client::k8s::util::{build_client, read_token};
 
-pub async fn get_k8s_cronjobs() -> Result<PaginatedResponse<CronJob>> {
-    get_k8s_cronjobs_paginated(None, None).await
-}
-
 pub async fn get_k8s_cronjobs_paginated(
     limit: Option<usize>,
     offset: Option<usize>,

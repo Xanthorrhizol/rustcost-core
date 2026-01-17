@@ -5,10 +5,6 @@ use crate::api::dto::paginated_response::PaginatedResponse;
 use crate::core::client::k8s::client_k8s_statefulset;
 use crate::core::client::k8s::util::{build_client, read_token};
 
-pub async fn get_k8s_statefulsets() -> Result<PaginatedResponse<StatefulSet>> {
-    get_k8s_statefulsets_paginated(None, None).await
-}
-
 pub async fn get_k8s_statefulsets_paginated(
     limit: Option<usize>,
     offset: Option<usize>,
@@ -45,10 +41,7 @@ pub async fn get_k8s_statefulset(namespace: String, name: String) -> Result<Stat
     let client = build_client()?;
 
     client_k8s_statefulset::fetch_statefulset_by_name_and_namespace(
-        &token,
-        &client,
-        &namespace,
-        &name,
+        &token, &client, &namespace, &name,
     )
     .await
 }
