@@ -2,25 +2,29 @@ use std::net::SocketAddr;
 use tokio::sync::broadcast;
 
 // --- Modules ---
-mod config;
-mod logging;
-mod domain;
 mod api;
-mod errors;
-mod routes;
-mod scheduler;
+mod app_state;
+mod config;
 pub mod core;
 mod debug;
-mod app_state;
+mod domain;
+mod errors;
+mod logging;
+pub mod refactor;
+mod routes;
+mod scheduler;
+
+#[macro_use]
+extern crate rustcost_core;
 
 // --- Imports ---
 use crate::config::config;
 use crate::debug::run_debug;
 // &'fixed Config
+use crate::app_state::build_app_state;
 use crate::routes::app_router;
 use crate::scheduler::scheduler_start_all_tasks;
 use tracing::{error, info};
-use crate::app_state::{build_app_state};
 
 // --- Entry Point ---
 #[tokio::main]
@@ -34,11 +38,10 @@ async fn main() {
 
 /// ✅ Initialize tracing (logs stored in file)
 
-
 /// ✅ Run the Axum server
 async fn run_server(app_config: &crate::config::Config) {
     let app_state = build_app_state();
-    let scheduler_state  = app_state.clone();
+    let scheduler_state = app_state.clone();
 
     let app = app_router().with_state(app_state);
     let address = format!("{}:{}", app_config.server_host(), app_config.server_port());
@@ -62,21 +65,18 @@ async fn run_server(app_config: &crate::config::Config) {
         // Run the scheduler as a background task that blocks until it receives shutdown
         let sched_rx = shutdown_rx.resubscribe();
         tokio::spawn(async move {
-            scheduler_start_all_tasks(scheduler_state , sched_rx).await;
+            scheduler_start_all_tasks(scheduler_state, sched_rx).await;
         });
     }
 
-
-
     // Graceful shutdown: Ctrl+C => send shutdown => server stops
     let shutdown_tx_clone = shutdown_tx.clone();
-    let server = axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            // Wait for Ctrl+C
-            let _ = tokio::signal::ctrl_c().await;
-            info!("🔻 Ctrl+C received, sending shutdown...");
-            let _ = shutdown_tx_clone.send(());
-        });
+    let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+        // Wait for Ctrl+C
+        let _ = tokio::signal::ctrl_c().await;
+        info!("🔻 Ctrl+C received, sending shutdown...");
+        let _ = shutdown_tx_clone.send(());
+    });
 
     // Also listen for a shutdown message to finish this function if needed
     tokio::select! {
@@ -89,5 +89,4 @@ async fn run_server(app_config: &crate::config::Config) {
             info!("🔻 Shutdown received; exiting run_server");
         }
     }
-
 }

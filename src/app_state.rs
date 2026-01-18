@@ -267,7 +267,6 @@ impl LlmService {
 // INFO K8S
 // ============================================================
 //
-// {{{ INFO K8S
 #[derive(Clone, Default)]
 pub struct InfoK8sService;
 
@@ -514,7 +513,6 @@ impl InfoK8sService {
         patch_info_k8s_container(id, payload).await
     }
 }
-// }}}
 
 //
 // ============================================================

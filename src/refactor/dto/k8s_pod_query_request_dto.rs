@@ -1,0 +1,30 @@
+//! Info API DTOs
+
+use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(dead_code)]
+pub struct K8sPodQueryRequestDto {
+    pub start: Option<NaiveDateTime>,
+    pub end: Option<NaiveDateTime>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+    pub sort: Option<String>,
+    pub namespace: Option<String>,
+    pub node: Option<String>,
+    pub deployment: Option<String>,
+    pub name: Option<String>,
+    /// Label selector (e.g., "app=myservice,team=infra")
+    pub label_selector: Option<String>,
+
+    /// Filter metrics by the owning team.
+    pub team: Option<String>,
+
+    /// Filter metrics by specific microservice name.
+    pub service: Option<String>,
+
+    /// Filter by deployment environment.
+    /// Common values: `"dev"`, `"stage"`, `"prod"`.
+    pub env: Option<String>,
+}
