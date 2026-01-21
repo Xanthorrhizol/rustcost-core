@@ -18,3 +18,17 @@ macro_rules! llm_actor_addr {
         "/llm"
     };
 }
+
+#[macro_export(local_inner_macros)]
+macro_rules! runtime_actor_addr {
+    () => {
+        "/runtime"
+    };
+}
+
+#[macro_export(local_inner_macros)]
+macro_rules! log_actor_addr {
+    () => {
+        "/log"
+    };
+}

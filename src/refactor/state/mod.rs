@@ -39,6 +39,7 @@ pub enum StateActorResult {
     InfoPodEntity(InfoPodEntity),
 
     // entity vector
+    VecInfoAlertEntity(Vec<InfoAlertEntity>),
     VecInfoContainerEntity(Vec<InfoContainerEntity>),
     VecInfoNodeEntity(Vec<InfoNodeEntity>),
 
@@ -185,7 +186,7 @@ pub enum InfoK8sServiceMessage {
     /// pod_uid
     GetInfoK8sPod(String),
     /// filter
-    ListK8sPods(K8sPodQueryRequestDto),
+    ListK8sPods(K8sPodQueryRequest),
     /// id, payload
     PatchInfoK8sPod(String, InfoK8sPodPatchRequest),
 

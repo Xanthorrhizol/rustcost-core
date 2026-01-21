@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(dead_code)]
-pub struct K8sPodQueryRequestDto {
+pub struct K8sPodQueryRequest {
     pub start: Option<NaiveDateTime>,
     pub end: Option<NaiveDateTime>,
     pub limit: Option<usize>,
