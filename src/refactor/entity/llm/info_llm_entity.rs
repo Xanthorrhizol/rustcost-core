@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::info::dto::info_llm_upsert_request::InfoLlmUpsertRequest;
 use super::llm_provider::LlmProvider;
+use crate::refactor::dto::InfoLlmUpsertRequest;
 
 /// Configuration for outbound LLM calls.
 #[derive(Debug, Clone, Serialize, Deserialize)]

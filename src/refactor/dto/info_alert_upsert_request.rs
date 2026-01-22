@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::core::persistence::info::fixed::alerts::alert_rule_entity::{
-    AlertMetricType, AlertOperator, AlertRuleEntity, AlertSeverity,
-};
+use crate::refactor::entity::{AlertMetricType, AlertOperator, AlertRuleEntity, AlertSeverity};
 
 /// Upsert payload for alert configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]

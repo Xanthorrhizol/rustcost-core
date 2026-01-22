@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::core::persistence::info::fixed::llm::llm_provider::LlmProvider;
+use crate::refactor::entity::LlmProvider;
 
 /// Upsert payload for LLM configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
