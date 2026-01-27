@@ -1,9 +1,9 @@
 use anyhow::Result;
-use kube::{Api, Client};
 use kube::api::ListParams;
+use kube::{Api, Client};
 use tracing::debug;
 
-use crate::core::client::kube_resources::CronJob;
+use k8s_openapi::api::batch::v1::CronJob;
 
 /// Fetch all cronjobs in the cluster
 pub async fn fetch_cronjobs(client: &Client) -> Result<Vec<CronJob>> {
@@ -15,10 +15,7 @@ pub async fn fetch_cronjobs(client: &Client) -> Result<Vec<CronJob>> {
 }
 
 /// Fetch cronjobs in a specific namespace
-pub async fn fetch_cronjobs_by_namespace(
-    client: &Client,
-    namespace: &str,
-) -> Result<Vec<CronJob>> {
+pub async fn fetch_cronjobs_by_namespace(client: &Client, namespace: &str) -> Result<Vec<CronJob>> {
     let cronjobs: Api<CronJob> = Api::namespaced(client.clone(), namespace);
     let cj_list = cronjobs.list(&ListParams::default()).await?;
 
